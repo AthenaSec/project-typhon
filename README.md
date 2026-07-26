@@ -6,8 +6,7 @@ articles, and generate an audit-style HTML report.
 
 This is being built to validate demand with design partners (compliance
 officers, AI/ML leads shipping LLM features in the EU) before investing in a
-real product — not production software. See [AGENTS.md](AGENTS.md) for the
-full design rationale and constraints.
+real product — not production software. 
 
 ## How it works
 
