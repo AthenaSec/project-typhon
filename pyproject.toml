@@ -1,0 +1,12 @@
+[project]
+name = "project-typhon"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.140.0",
+    "uvicorn[standard]>=0.30.0",
+    "anthropic>=0.90.0",
+    "python-dotenv>=1.0.0",
+]
