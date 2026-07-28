@@ -56,3 +56,5 @@ def chat(req: ChatRequest):
     history.append({"role": "assistant", "content": reply_text})
 
     return ChatResponse(response=reply_text, conversation_id=conversation_id)
+
+# test
