@@ -5,12 +5,17 @@ Usage:
 """
 
 import argparse
+import logging
 from pathlib import Path
 
+from observability.store import finish_run, init_db, start_run
 from redteam_engine.runner import load_attack_pack, run_pack
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    init_db()
+    run_id = start_run(args.target)
+
     packs_path = Path(args.packs)
     pack_files = sorted(packs_path.glob("*.yaml")) if packs_path.is_dir() else [packs_path]
 
@@ -21,10 +26,13 @@ def cmd_run(args: argparse.Namespace) -> None:
     all_results = []
     for pack_file in pack_files:
         pack = load_attack_pack(pack_file)
-        all_results.extend(run_pack(args.target, pack))
+        all_results.extend(run_pack(args.target, pack, run_id))
+
+    finish_run(run_id)
 
     vulnerable = [r for r in all_results if r.judgment.vulnerable]
     print(f"\n{len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
+    print(f"Run ID: {run_id}")
     if vulnerable:
         print()
         for r in vulnerable:
@@ -33,6 +41,8 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     parser = argparse.ArgumentParser(description="project-typhon: automated red-team + EU AI Act compliance PoC")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
