@@ -8,7 +8,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from observability.store import finish_run, init_db, start_run
+from compliance.mapper import map_findings
+from observability.store import finish_run, get_findings, init_db, start_run
 from redteam_engine.runner import load_attack_pack, run_pack
 
 
@@ -33,11 +34,17 @@ def cmd_run(args: argparse.Namespace) -> None:
     vulnerable = [r for r in all_results if r.judgment.vulnerable]
     print(f"\n{len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
     print(f"Run ID: {run_id}")
+
     if vulnerable:
-        print()
-        for r in vulnerable:
-            print(f"  [{r.category}] {r.attack.id} — {r.attack.name}")
-            print(f"    {r.judgment.rationale}")
+        compliance_findings = map_findings(get_findings(run_id))
+        print("\nCompliance findings (EU AI Act):\n")
+        for f in compliance_findings:
+            print(f"  [{f['category']}] {f['attack_id']} — {f['attack_name']}")
+            print(f"    {f['article']}: {f['title']}")
+            print(f"    Evidence: {f['rationale']}")
+            print(f"    Why it matters: {f['compliance_rationale']}")
+            print(f"    Remediation: {f['remediation']}")
+            print()
 
 
 def main() -> None:
