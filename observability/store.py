@@ -112,6 +112,13 @@ def save_finding(
         )
 
 
+def get_run(run_id: str) -> dict:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        return dict(row) if row else {}
+
+
 def get_findings(run_id: str | None = None) -> list[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row

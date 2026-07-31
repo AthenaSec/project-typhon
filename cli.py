@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from compliance.mapper import map_findings
+from compliance.report_generator import generate_report
 from observability.store import finish_run, get_findings, init_db, start_run
 from redteam_engine.runner import load_attack_pack, run_pack
 
@@ -45,6 +46,9 @@ def cmd_run(args: argparse.Namespace) -> None:
             print(f"    Why it matters: {f['compliance_rationale']}")
             print(f"    Remediation: {f['remediation']}")
             print()
+
+    report_path = generate_report(run_id)
+    print(f"Report written to {report_path}")
 
 
 def main() -> None:
