@@ -5,12 +5,19 @@ Usage:
 """
 
 import argparse
+import logging
 from pathlib import Path
 
+from compliance.mapper import map_findings
+from compliance.report_generator import generate_report
+from observability.store import finish_run, get_findings, init_db, start_run
 from redteam_engine.runner import load_attack_pack, run_pack
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    init_db()
+    run_id = start_run(args.target)
+
     packs_path = Path(args.packs)
     pack_files = sorted(packs_path.glob("*.yaml")) if packs_path.is_dir() else [packs_path]
 
@@ -21,18 +28,32 @@ def cmd_run(args: argparse.Namespace) -> None:
     all_results = []
     for pack_file in pack_files:
         pack = load_attack_pack(pack_file)
-        all_results.extend(run_pack(args.target, pack))
+        all_results.extend(run_pack(args.target, pack, run_id))
+
+    finish_run(run_id)
 
     vulnerable = [r for r in all_results if r.judgment.vulnerable]
     print(f"\n{len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
+    print(f"Run ID: {run_id}")
+
     if vulnerable:
-        print()
-        for r in vulnerable:
-            print(f"  [{r.category}] {r.attack.id} — {r.attack.name}")
-            print(f"    {r.judgment.rationale}")
+        compliance_findings = map_findings(get_findings(run_id))
+        print("\nCompliance findings (EU AI Act):\n")
+        for f in compliance_findings:
+            print(f"  [{f['category']}] {f['attack_id']} — {f['attack_name']}")
+            print(f"    {f['article']}: {f['title']}")
+            print(f"    Evidence: {f['rationale']}")
+            print(f"    Why it matters: {f['compliance_rationale']}")
+            print(f"    Remediation: {f['remediation']}")
+            print()
+
+    report_path = generate_report(run_id)
+    print(f"Report written to {report_path}")
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     parser = argparse.ArgumentParser(description="project-typhon: automated red-team + EU AI Act compliance PoC")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
