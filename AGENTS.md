@@ -73,5 +73,4 @@ project-typhon/
 ## What NOT to do
 
 - Don't add self-serve/multi-tenant infrastructure (auth, rate limiting, user accounts) — this is a single-operator demo tool for now, not a live product.
-- Don't quietly expand the attack engine into a full Promptfoo/Garak integration — canned, curated attacks are the goal for the demo, not exhaustive coverage.
 - Don't over-engineer the target agent — it's meant to be a simple, deliberately weak wrapper, not a realistic production app.
