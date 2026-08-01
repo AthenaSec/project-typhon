@@ -31,7 +31,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "promptfoo" / "promptfooconfig.yaml"
+DEFAULT_CONFIG_PATH = Path(__file__).parent / "promptfooconfig.yaml"
 
 # Short, human-curated description of what each promptfoo plugin is trying
 # to elicit, fed to judge.py as the attack "goal" — promptfoo's own
