@@ -17,6 +17,7 @@
 # reliably in a live demo" principle in AGENTS.md.
 
 # to check additional plugins, visit 'https://www.promptfoo.dev/docs/red-team/plugins/'
+# however, not every plugin listed there will actually generate for us, if we see 🌐, that means it is cloud only
 
 targets:
   - id: http
