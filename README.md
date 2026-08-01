@@ -70,15 +70,30 @@ uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/a
 This runs every attack pack in `redteam_engine/attack_packs/`, judges each
 response, and prints a summary of which attacks found a vulnerability.
 
+### Using the promptfoo engine
+
+`--engine promptfoo` swaps attack generation/delivery from the hand-written
+`attack_packs/` YAML to [promptfoo](https://www.promptfoo.dev/)'s red-team
+engine (`redteam_engine/promptfoo/promptfooconfig.yaml`), while still
+grading every response with `judge.py` — promptfoo's own grader is not used
+(see `redteam_engine/promptfoo_runner.py` for why). Requires Node.js 20+
+(invoked via `npx`, no extra install step):
+
+```bash
+uv run python cli.py run --target http://localhost:8000 --engine promptfoo
+```
+
 ## Directory structure
 
 ```
 project-typhon/
 ├── target_agent/          # mock company chatbot (FastAPI), deliberately weak system prompt
 ├── redteam_engine/
-│   ├── attack_packs/      # YAML attack definitions, grouped by category
-│   ├── runner.py          # sends attacks to target, collects responses
-│   ├── judge.py           # LLM-as-judge: did the attack succeed?
+│   ├── attack_packs/      # YAML attack definitions, grouped by category (native engine)
+│   ├── promptfoo/         # promptfooconfig.yaml (promptfoo engine, generation/delivery only)
+│   ├── runner.py          # native engine: sends attacks to target, collects responses
+│   ├── promptfoo_runner.py # promptfoo engine: drives `npx promptfoo` for generation/delivery
+│   ├── judge.py           # LLM-as-judge: did the attack succeed? (grades both engines)
 │   └── schemas.py         # pydantic models
 ├── observability/         # SQLite persistence of runs + findings (planned)
 ├── compliance/            # findings → EU AI Act article mapping + report generator (planned)

@@ -22,7 +22,7 @@ This is being used to validate demand with design partners (compliance officers,
 ```
 Target Agent (mock vulnerable chatbot)
         ↓ attacked by
-Red Team Engine (runner + attack packs + judge)
+Red Team Engine (native attack packs, or promptfoo for generation/delivery — judge.py always grades)
         ↓ logs to
 Observability (SQLite for PoC)
         ↓ read by
@@ -39,9 +39,11 @@ CLI (single entrypoint for the whole run)
 project-typhon/
 ├── target_agent/          # mock company chatbot (FastAPI), deliberately weak system prompt
 ├── redteam_engine/
-│   ├── attack_packs/      # YAML attack definitions, grouped by category
-│   ├── runner.py          # sends attacks to target, collects responses
-│   ├── judge.py           # LLM-as-judge: did the attack succeed?
+│   ├── attack_packs/      # YAML attack definitions, grouped by category (native engine)
+│   ├── promptfoo/         # promptfooconfig.yaml (generation/delivery config, promptfoo engine)
+│   ├── runner.py          # native engine: sends attack_packs prompts to target, collects responses
+│   ├── promptfoo_runner.py # promptfoo engine: drives `npx promptfoo` for generation/delivery only
+│   ├── judge.py           # LLM-as-judge: did the attack succeed? (grades both engines)
 │   └── schemas.py         # pydantic models
 ├── observability/         # SQLite persistence of runs + findings
 ├── compliance/
@@ -49,7 +51,7 @@ project-typhon/
 │   ├── mapper.py
 │   └── report_generator.py
 ├── reports/                # generated HTML reports land here
-├── cli.py                  # single entrypoint: python cli.py run --target ... --packs ...
+├── cli.py                  # single entrypoint: python cli.py run --target ... [--engine native|promptfoo]
 ├── docker-compose.yml
 └── README.md
 ```
@@ -57,7 +59,8 @@ project-typhon/
 ## Key design principles
 
 - **PoC-appropriate stack.** No LangGraph/Redis/Langfuse here — deliberately kept simple (single-process runner, SQLite) so it's fast to build and easy to demo live without infra explaining-away. Production stack decisions come later, after validation.
-- **Attack packs and article mappings are data, not code.** They live in YAML (`redteam_engine/attack_packs/*.yaml`, `compliance/article_map.yaml`) so they're easy to read, edit, and eventually show to non-engineers. These two files are the actual differentiator of the demo — treat them as first-class, not boilerplate.
+- **Attack packs and article mappings are data, not code.** They live in YAML (`redteam_engine/attack_packs/*.yaml`, `redteam_engine/promptfoo/promptfooconfig.yaml`, `compliance/article_map.yaml`) so they're easy to read, edit, and eventually show to non-engineers. These files are the actual differentiator of the demo — treat them as first-class, not boilerplate.
+- **promptfoo generates and delivers attacks; it does not grade them.** Its built-in grader has been observed giving false negatives (see `redteam_engine/promptfoo_runner.py` docstring). `judge.py` is the single source of truth for pass/fail on every engine — don't wire promptfoo's `gradingResult.pass` into findings.
 - **The report is the real deliverable.** The live attack is the hook; the generated report is what a compliance person actually evaluates. Keep report styling minimal and serious — audit report, not marketing deck.
 - **Everything should run end-to-end from one CLI command.** `python cli.py run --target <url> --packs <packs>` should always work and print live progress to the terminal — this needs to look good running live in front of someone.
 - **Swappable target.** The target agent's system prompt and endpoint should be easy to swap out, since later demos may point at a design partner's actual staging endpoint instead of the mock agent.
@@ -69,6 +72,7 @@ project-typhon/
 - Prefer explicit, readable code over clever abstractions — this needs to be explainable in a demo/pitch context, not just functional.
 - When in doubt about scope, keep it PoC-sized. Don't add auth, multi-tenancy, queueing, or production hardening unless explicitly asked.
 - Dependency management is `uv`, not pip/poetry.
+- Node.js 20+ is required only for the promptfoo engine (`--engine promptfoo`); it's invoked via `npx promptfoo@latest` as a subprocess, never vendored into the repo.
 
 ## What NOT to do
 

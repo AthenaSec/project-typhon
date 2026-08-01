@@ -1,7 +1,7 @@
 """Single entrypoint for a red-team run: attacks the target agent and prints results.
 
 Usage:
-    uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/attack_packs
+    uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/attack_packs --engine native/promptfoo
 """
 
 import argparse
@@ -11,6 +11,7 @@ from pathlib import Path
 from compliance.mapper import map_findings
 from compliance.report_generator import generate_report
 from observability.store import finish_run, get_findings, init_db, start_run
+from redteam_engine.promptfoo_runner import run_promptfoo
 from redteam_engine.runner import load_attack_pack, run_pack
 
 
@@ -18,17 +19,20 @@ def cmd_run(args: argparse.Namespace) -> None:
     init_db()
     run_id = start_run(args.target)
 
-    packs_path = Path(args.packs)
-    pack_files = sorted(packs_path.glob("*.yaml")) if packs_path.is_dir() else [packs_path]
+    if args.engine == "promptfoo":
+        all_results = run_promptfoo(args.target, run_id)
+    else:
+        packs_path = Path(args.packs)
+        pack_files = sorted(packs_path.glob("*.yaml")) if packs_path.is_dir() else [packs_path]
 
-    if not pack_files:
-        print(f"No attack packs found at {packs_path}")
-        return
+        if not pack_files:
+            print(f"No attack packs found at {packs_path}")
+            return
 
-    all_results = []
-    for pack_file in pack_files:
-        pack = load_attack_pack(pack_file)
-        all_results.extend(run_pack(args.target, pack, run_id))
+        all_results = []
+        for pack_file in pack_files:
+            pack = load_attack_pack(pack_file)
+            all_results.extend(run_pack(args.target, pack, run_id))
 
     finish_run(run_id)
 
@@ -60,6 +64,13 @@ def main() -> None:
     run_parser = subparsers.add_parser("run", help="Attack a target agent with one or more attack packs")
     run_parser.add_argument("--target", required=True, help="Base URL of the target agent, e.g. http://localhost:8000")
     run_parser.add_argument("--packs", default="redteam_engine/attack_packs", help="Attack pack YAML file or directory")
+    run_parser.add_argument(
+        "--engine",
+        choices=["native", "promptfoo"],
+        default="native",
+        help="native: hand-written attack_packs YAML (default). promptfoo: promptfoo's red-team engine for "
+        "generation/delivery, graded by judge.py. Requires Node.js 20+ (npx).",
+    )
     run_parser.set_defaults(func=cmd_run)
 
     args = parser.parse_args()
