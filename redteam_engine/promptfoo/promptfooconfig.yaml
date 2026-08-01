@@ -16,6 +16,8 @@
 # so `cli.py run --engine promptfoo` always works standalone, per the "runs
 # reliably in a live demo" principle in AGENTS.md.
 
+# to check additional plugins, visit 'https://www.promptfoo.dev/docs/red-team/plugins/'
+
 targets:
   - id: http
     label: target-agent
