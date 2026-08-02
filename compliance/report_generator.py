@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markdown_it import MarkdownIt
+from markupsafe import Markup
 
 from compliance.mapper import map_findings
 from observability.store import get_findings, get_run
@@ -17,10 +19,23 @@ from observability.store import get_findings, get_run
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
+# html=False escapes any raw HTML in the source text instead of passing it
+# through — both the judge's rationale and the raw transcript are derived
+# from the target's (untrusted) response, so this keeps markdown rendering
+# from becoming an XSS vector. breaks=True treats single newlines as <br>,
+# since chat-style LLM output isn't always strict CommonMark.
+_md = MarkdownIt("commonmark", {"html": False, "breaks": True})
+
+
+def _render_markdown(text: str) -> Markup:
+    return Markup(_md.render(text))
+
+
 _env = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
     autoescape=select_autoescape(["html"]),
 )
+_env.filters["markdown"] = _render_markdown
 
 
 def generate_report(run_id: str) -> Path:

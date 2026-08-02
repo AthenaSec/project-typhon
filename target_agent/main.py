@@ -5,7 +5,7 @@ that gets attacked. Swap SYSTEM_PROMPT_PATH / TARGET_MODEL / LLM_PROVIDER via
 env vars to point this at a different persona, model, or provider without
 touching code.
 
-Launch it using uv run uvicorn target_agent.main:app --port 8000 at the root of the repo
+Launch it using `uv run uvicorn target_agent.main:app --port 8000` at the root of the repo
 
 """
 

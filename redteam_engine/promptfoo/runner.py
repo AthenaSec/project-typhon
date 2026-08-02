@@ -101,7 +101,7 @@ def run_promptfoo(target_url: str, run_id: str, config_path: Path = DEFAULT_CONF
         )
         print(f"  {attack.id:<24} ", end="", flush=True)
         try:
-            judgment = judge_attack(attack, response)
+            judgment = judge_attack(plugin_id, attack, response)
         except Exception:
             logger.exception("Judging promptfoo attack %s failed", attack.id)
             print("ERROR")
