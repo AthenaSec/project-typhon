@@ -21,7 +21,12 @@ def cmd_run(args: argparse.Namespace) -> None:
     all_results = []
     for pack_file in pack_files:
         pack = load_attack_pack(pack_file)
-        all_results.extend(run_pack(args.target, pack))
+        if pack.engine == "pyrit":
+            from redteam_engine.pyrit.runner import run_pyrit_pack  # lazy: optional `pyrit` dep group
+
+            all_results.extend(run_pyrit_pack(args.target, pack))
+        else:
+            all_results.extend(run_pack(args.target, pack))
 
     vulnerable = [r for r in all_results if r.judgment.vulnerable]
     print(f"\n{len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
