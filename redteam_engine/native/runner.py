@@ -38,7 +38,7 @@ def run_pack(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResul
         print(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
         try:
             response = send_attack(target_url, attack)
-            judgment = judge_attack(attack, response)
+            judgment = judge_attack(pack.category, attack, response)
         except Exception:
             logger.exception("Attack %s (%s) failed", attack.id, pack.category)
             print("ERROR")
