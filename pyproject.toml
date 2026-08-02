@@ -19,3 +19,6 @@ dependencies = [
 pyrit = [
     "pyrit==1.0.1",
 ]
+dashboard = [
+    "streamlit>=1.38",
+]

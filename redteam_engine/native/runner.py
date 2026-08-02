@@ -45,8 +45,8 @@ def run_pack(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResul
             continue
 
         print("VULNERABLE" if judgment.vulnerable else "held")
-        save_finding(run_id, pack.category, attack, response, judgment)
+        save_finding(run_id, pack.category, attack, response, judgment, engine="native")
         results.append(
-            AttackResult(category=pack.category, attack=attack, response=response, judgment=judgment)
+            AttackResult(category=pack.category, attack=attack, response=response, judgment=judgment, engine="native")
         )
     return results

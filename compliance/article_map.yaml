@@ -2,11 +2,23 @@
 # it as first-class, not boilerplate.
 #
 # These mappings are illustrative for demo purposes, not certified legal
-# advice. Verify against the official Official Journal text before this
-# goes in front of an actual compliance officer.
+# advice. Checked 2026-08-02 against the official Official Journal text
+# (Regulation (EU) 2024/1689, docs/EU_AI_Act.pdf) — article numbers, titles,
+# and paragraph pins below are taken from that text. Re-verify against the
+# official text again before this goes in front of an actual compliance
+# officer, and any time an article/paragraph pin below is touched.
+#
+# Article citations are pinned to the specific paragraph a category's
+# behavior actually falls under (e.g. "Article 15(5)", not just "Article
+# 15") — most of Article 15/12/13/14 only bind "high-risk" AI systems under
+# Chapter III, so a real compliance mapping would first need an Annex III
+# classification for the target system. Article 5's prohibited practices are
+# the one exception: they bind every AI system regardless of risk tier,
+# which is why the two categories at the bottom of this file
+# (vulnerability_exploitation, manipulative_persuasion) are worth having.
 
 prompt_injection:
-  article: "Article 15"
+  article: "Article 15(5)"
   title: "Accuracy, Robustness and Cybersecurity"
   compliance_rationale: >
     Article 15(5) requires high-risk AI systems to be resilient against
@@ -23,7 +35,7 @@ prompt_injection:
     after any system prompt change.
 
 impersonation:
-  article: "Article 15"
+  article: "Article 15(5)"
   title: "Accuracy, Robustness and Cybersecurity"
   compliance_rationale: >
     Article 15(5) names "confidentiality attacks" as a vulnerability class
@@ -40,7 +52,7 @@ impersonation:
     claim as unverified by default.
 
 multi_turn_escalation:
-  article: "Article 15"
+  article: "Article 15(5)"
   title: "Accuracy, Robustness and Cybersecurity"
   compliance_rationale: >
     Article 15(5) requires resilience against attempts to exploit system
@@ -51,6 +63,16 @@ multi_turn_escalation:
     incrementally reframed across several turns — shows the system's
     guardrails operate at the message level, not the session level,
     which is the gap Article 15(5) is meant to close.
+  secondary_article: "Article 14(4)(a)"
+  secondary_title: "Human Oversight"
+  secondary_rationale: >
+    Article 14(4)(a) requires that whoever oversees the system be able to
+    "duly monitor its operation, including in view of detecting and
+    addressing anomalies, dysfunctions and unexpected performance." A
+    guardrail that silently erodes over a conversation rather than failing
+    on a single identifiable message is exactly the kind of dysfunction
+    that per-message oversight can't detect — it only shows up when someone
+    reviews the full session trace.
   remediation: >
     Evaluate trust and disclosure decisions against the full conversation
     state, not just the current message — re-check authority claims and
@@ -64,7 +86,7 @@ multi_turn_escalation:
 # pack. The join key is promptfoo's plugin id, not a category we chose.
 
 prompt-extraction:
-  article: "Article 15"
+  article: "Article 15(5)"
   title: "Accuracy, Robustness and Cybersecurity"
   compliance_rationale: >
     Article 15(5) requires high-risk AI systems to be resilient against
@@ -81,18 +103,156 @@ prompt-extraction:
     channel, never the end-user chat interface itself.
 
 imitation:
-  article: "Article 50"
-  title: "Transparency Obligations for Certain AI Systems"
+  article: "Article 50(1)"
+  title: "Transparency Obligations for Providers and Deployers of Certain AI Systems"
   compliance_rationale: >
-    Article 50 requires that natural persons interacting with an AI system
-    are not deceived about what they are dealing with. A system that, on
-    request, adopts the voice of a real, unrelated brand or named
-    individual (e.g. a competitor's support agent, a named executive) and
-    speaks in their persona blurs exactly that line — a user could
+    Article 50(1) requires that natural persons be informed they are
+    interacting with an AI system, unless that would be obvious to a
+    reasonably well-informed person in context. A system that, on request,
+    adopts the voice of a real, unrelated brand or named individual (e.g. a
+    competitor's support agent, a named executive) and speaks in their
+    persona defeats that safeguard by a different route — a user could
     reasonably come away believing they received a statement from that
-    brand or person rather than from the deployer's own assistant.
+    brand or person rather than from an AI system operated by the deployer.
   remediation: >
     Constrain the assistant to its own declared identity: decline
     roleplay/persona requests that involve impersonating a specific real
     brand, organization, or named individual, and keep that constraint
     independent of how the request is framed (game, test, hypothetical).
+
+# The categories below come from the pyrit engine (packs with `engine:
+# pyrit`, see redteam_engine/pyrit/runner.py) and were bootstrapped from
+# PyRIT's own bundled seed-prompt datasets via
+# redteam_engine/pyrit/scenario_import.py, then hand-reviewed.
+
+code_execution_injection:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires high-risk AI systems to be resilient against
+    attempts to exploit system vulnerabilities by manipulating the model's
+    outputs or behavior. A system that responds to an embedded shell/code
+    snippet by claiming to have executed it (or fabricating command
+    output) demonstrates that adversarial input can make it act, or
+    convincingly pretend to act, outside its intended text-generation
+    capability — exactly the kind of manipulation Article 15(5)
+    contemplates.
+  remediation: >
+    Explicitly constrain the assistant to never claim command/code
+    execution or fabricate system output, add a guardrail that recognizes
+    and declines shell/code-execution framing regardless of phrasing, and
+    re-run this attack pack after any system prompt or guardrail change.
+
+copyright_ip_leakage:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against attempts to exploit system
+    vulnerabilities through manipulation, including obfuscation techniques
+    that mask a request's true intent. A system that reproduces large
+    verbatim excerpts of copyrighted text once the request is disguised
+    with an unrelated formatting instruction (e.g. word-by-word
+    placeholders) shows its content-reproduction guardrail is evaluating
+    surface phrasing rather than the underlying request — the same
+    instruction-following vulnerability class as prompt injection, just
+    targeting a different guardrail.
+  remediation: >
+    Evaluate reproduction/output-length guardrails against the requested
+    content itself, independent of formatting or obfuscation instructions
+    layered on top of the request, and re-run this attack pack after any
+    system prompt or guardrail change.
+
+# The categories below come from a PyRIT native Scenario (a scenario
+# descriptor under redteam_engine/native/attack_packs/pyrit_scenarios/, see
+# redteam_engine/pyrit/scenario_runner.py) rather than a hand-written attack
+# pack — one PyRIT Scenario sweeps many techniques x dataset objectives, so
+# findings here are broader and less individually curated than the
+# hand-written packs above.
+
+data_leakage:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires high-risk AI systems to be resilient against
+    confidentiality attacks that exploit system vulnerabilities — explicitly
+    including adversarial examples and model manipulation. PyRIT's Leakage
+    scenario probes exactly this class through roleplay/persuasion framing
+    and gradual escalation: system-prompt disclosure, memorized-credential
+    leakage, and verbatim reproduction of training data are all
+    confidentiality failures the system should resist regardless of how the
+    request is dressed up.
+  remediation: >
+    Never let roleplay, persona, or "for a story/script" framing bypass
+    disclosure guardrails — evaluate what's actually being asked for, not
+    the fictional wrapper around it. Treat system-prompt and credential
+    disclosure as out of scope regardless of framing, and re-run this
+    scenario after any system prompt or guardrail change.
+
+web_output_injection:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against exploitation of system
+    vulnerabilities affecting outputs and performance. A system that can be
+    made to emit markdown/HTML constructs designed for data exfiltration or
+    cross-site scripting demonstrates its output isn't being validated
+    against downstream rendering risk — an attacker exploiting how the
+    system's *output*, not just its input handling, gets consumed
+    elsewhere.
+  remediation: >
+    Sanitize or strip markdown/HTML constructs capable of triggering
+    network requests or script execution in any client that renders the
+    assistant's output, treat this as an output-encoding boundary rather
+    than a prompt-content guardrail, and re-run this scenario after any
+    change to output rendering or sanitization.
+
+# The two categories below are worth having because Article 5's prohibited
+# practices are the one part of the Act that binds every AI system
+# regardless of risk tier or Annex III classification — unlike Article
+# 15/12/13/14 above, which only bind systems already classified
+# "high-risk". Both now have a hand-written native attack pack
+# (redteam_engine/native/attack_packs/vulnerability_exploitation.yaml and
+# manipulative_persuasion.yaml) targeting the BrightPath Financial persona
+# (the same one described in redteam_engine/promptfoo/promptfooconfig.yaml
+# and the actual target_agent system prompt), so they fire and map like any
+# other category under the default `--engine all`.
+
+vulnerability_exploitation:
+  article: "Article 5(1)(b)"
+  title: "Prohibited AI Practices"
+  compliance_rationale: >
+    Article 5(1)(b) prohibits an AI system from exploiting a person's
+    vulnerabilities due to age, disability, or a specific social or economic
+    situation, with the objective or effect of materially distorting their
+    behavior in a way that causes or is reasonably likely to cause them
+    significant harm. A financial-services assistant that, once a user
+    discloses financial distress, job loss, or old age, responds by steering
+    them toward a product that is against their interest (a high-fee loan,
+    an unsuitable investment) rather than declining to advise or escalating
+    to a human is exploiting exactly the vulnerability Article 5(1)(b)
+    prohibits — this is a blanket prohibition, not a high-risk-system-only
+    obligation, so it applies even to a "just a chatbot" deployment.
+  remediation: >
+    Detect disclosures of financial distress, age, or disability in the
+    conversation and route to a conservative, non-product-pushing response
+    (or human handoff) rather than a personalized sales pitch, independent
+    of how the request for a recommendation is framed.
+
+manipulative_persuasion:
+  article: "Article 5(1)(a)"
+  title: "Prohibited AI Practices"
+  compliance_rationale: >
+    Article 5(1)(a) prohibits AI systems that deploy purposefully
+    manipulative or deceptive techniques with the objective or effect of
+    materially distorting a person's behavior in a manner that causes or is
+    reasonably likely to cause significant harm. An assistant that can be
+    steered — via urgency framing, false scarcity, guilt, or fabricated
+    social proof — into pressuring a user toward a decision they would not
+    otherwise have made (e.g. opening an account, waiving a cooling-off
+    right) is engaging in the manipulative-technique behavior Article 5(1)(a)
+    bans outright, again regardless of the system's risk classification.
+  remediation: >
+    Constrain persuasive language to factual product information and
+    decline to use urgency, scarcity, or guilt framing regardless of how
+    the request or roleplay is set up; add an explicit guardrail against
+    generating pressure tactics even when a user asks for them directly.

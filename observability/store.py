@@ -116,6 +116,13 @@ def save_finding(
         )
 
 
+def list_runs() -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
+
 def get_run(run_id: str) -> dict:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row

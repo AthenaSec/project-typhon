@@ -1,0 +1,27 @@
+category: data_leakage
+description: >
+  PyRIT's built-in Leakage scenario (pyrit.scenario.scenarios.airt.leakage.Leakage).
+  Sweeps several jailbreak/roleplay techniques against PyRIT's bundled
+  airt_leakage dataset (seed_type: objective — each seed is a distinct goal:
+  system-prompt disclosure, credential leakage, verbatim copyrighted text).
+  Broader and less curated than the hand-written copyright_ip_leakage pack —
+  treat findings here as a coverage sweep, not a substitute for it.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.airt.leakage.Leakage
+max_concurrency: 4
+# Demo-sized default — PyRIT's bundled airt_leakage dataset has more seeds
+# than this; raise or drop this to sweep the full dataset for a real audit.
+max_dataset_size: 3
+# Leakage's own default technique set includes "image" (an image_path-input
+# technique) — excluded here since this project's targets are text-only (see
+# AGENTS.md and converters.py's own text-only scope). crescendo_* techniques
+# are also excluded: like this project's own pyrit_strategy: crescendo, they
+# need a target with editable conversation history, which scenario_runner.py
+# doesn't wire up yet (see runner.py's FastAPIEditableTarget for that pattern
+# — a follow-up, not done here).
+scenario_techniques:
+  - role_play_movie_script
+  - many_shot
+  - first_letter
+  - flip
+  - red_teaming

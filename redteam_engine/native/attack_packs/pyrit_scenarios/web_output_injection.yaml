@@ -1,0 +1,19 @@
+category: web_output_injection
+description: >
+  PyRIT's built-in garak WebInjection scenario
+  (pyrit.scenario.scenarios.garak.web_injection.WebInjection), ported from
+  garak's web_injection probe. Sweeps markdown data-exfiltration (CSRF-style)
+  and cross-site-scripting output-injection techniques — tests whether the
+  assistant can be made to emit markdown/HTML that would exfiltrate data or
+  execute in a client that renders its output unsanitized. All techniques are
+  text-only (markdown/HTML syntax, not real image/audio input), so the
+  scenario's default technique aggregate is used unrestricted.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.garak.web_injection.WebInjection
+max_concurrency: 4
+# Demo-sized default — WebInjection doesn't use the common dataset_config
+# path (its seed groups are built inline per technique), so this goes
+# through scenario_kwargs straight to the constructor instead of
+# max_dataset_size. Raise or drop for a real audit.
+scenario_kwargs:
+  max_prompts_per_technique: 2

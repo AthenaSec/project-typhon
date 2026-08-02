@@ -108,7 +108,9 @@ def run_promptfoo(target_url: str, run_id: str, config_path: Path = DEFAULT_CONF
             continue
 
         print("VULNERABLE" if judgment.vulnerable else "held")
-        save_finding(run_id, plugin_id, attack, response, judgment)
-        results.append(AttackResult(category=plugin_id, attack=attack, response=response, judgment=judgment))
+        save_finding(run_id, plugin_id, attack, response, judgment, engine="promptfoo")
+        results.append(
+            AttackResult(category=plugin_id, attack=attack, response=response, judgment=judgment, engine="promptfoo")
+        )
 
     return results

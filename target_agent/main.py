@@ -36,6 +36,13 @@ conversations: dict[str, list[dict]] = {}
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
+    # When set, the request is stateless: history + message are sent to the
+    # model as-is and nothing is persisted server-side. Lets PyRIT strategies
+    # that need editable conversation history (e.g. crescendo, which
+    # backtracks by rewriting prior turns) "edit" simply by sending a
+    # different history next call, without touching the append-only
+    # conversation_id-keyed store below.
+    history: list[dict] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -50,6 +57,11 @@ def health():
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    if req.history is not None:
+        stateless_history = [*req.history, {"role": "user", "content": req.message}]
+        reply_text = complete(client, TARGET_MODEL, SYSTEM_PROMPT, stateless_history)
+        return ChatResponse(response=reply_text, conversation_id=req.conversation_id or str(uuid.uuid4()))
+
     conversation_id = req.conversation_id or str(uuid.uuid4())
     history = conversations.setdefault(conversation_id, [])
 

@@ -21,6 +21,18 @@ def load_article_map() -> dict:
     return yaml.safe_load(ARTICLE_MAP_PATH.read_text())
 
 
+def list_all_mappings() -> list[dict]:
+    """Every category -> article mapping in article_map.yaml, regardless of
+    whether that category has ever fired a finding. Used for the report's and
+    dashboard's mapping reference table, so the full IP in article_map.yaml is
+    visible even for categories a given run didn't trigger."""
+    article_map = load_article_map()
+    return sorted(
+        ({"category": category, **mapping} for category, mapping in article_map.items()),
+        key=lambda m: m["category"],
+    )
+
+
 def map_findings(findings: list[dict]) -> list[dict]:
     article_map = load_article_map()
     mapped = []
@@ -35,3 +47,16 @@ def map_findings(findings: list[dict]) -> list[dict]:
         turns = json.loads(finding["trace"])["turns"] if finding.get("trace") else None
         mapped.append({**finding, **mapping, "turns": turns})
     return mapped
+
+
+def list_unmapped_categories(findings: list[dict]) -> set[str]:
+    """Categories of vulnerable findings with no article_map.yaml entry —
+    these get silently dropped by map_findings, so the dashboard/report
+    surface this explicitly rather than let a finding vanish with no trace
+    of why."""
+    article_map = load_article_map()
+    return {
+        f["category"]
+        for f in findings
+        if f.get("vulnerable") and f["category"] not in article_map
+    }

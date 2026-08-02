@@ -11,8 +11,10 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from compliance.mapper import map_findings
+from compliance.charts import build_article_bar_chart, build_pass_fail_donut
+from compliance.mapper import list_all_mappings, list_unmapped_categories, map_findings
 from observability.store import get_findings, get_run
+from redteam_engine.schemas import ENGINE_LABELS
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
@@ -33,6 +35,11 @@ def generate_report(run_id: str) -> Path:
         run=run,
         findings=findings,
         compliance_findings=compliance_findings,
+        unmapped_categories=sorted(list_unmapped_categories(findings)),
+        all_mappings=list_all_mappings(),
+        pass_fail_chart=build_pass_fail_donut(findings),
+        article_chart=build_article_bar_chart(compliance_findings),
+        engine_labels=ENGINE_LABELS,
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
 

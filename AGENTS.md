@@ -53,7 +53,7 @@ project-typhon/
 │   ├── mapper.py
 │   └── report_generator.py
 ├── reports/                # generated HTML reports land here
-├── cli.py                  # single entrypoint: python cli.py run --target ... [--engine native|promptfoo]
+├── cli.py                  # single entrypoint: python cli.py run --target ... [--engine all|native|promptfoo]
 ├── docker-compose.yml
 └── README.md
 ```
