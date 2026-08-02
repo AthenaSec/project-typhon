@@ -220,3 +220,6 @@ __marimo__/
 # project-typhon runtime state
 observability/*.db
 reports/*.html
+
+# macOS
+.DS_Store

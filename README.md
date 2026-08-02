@@ -13,7 +13,7 @@ real product — not production software.
 ```
 Target Agent (mock vulnerable chatbot)
         ↓ attacked by
-Red Team Engine (runner + attack packs + judge)
+Red Team Engine (native attack packs or promptfoo — generation/delivery; judge.py always grades)
         ↓ logs to
 Observability (SQLite for PoC)
         ↓ read by
@@ -29,12 +29,12 @@ CLI (single entrypoint for the whole run)
 | Component        | Status                                                               |
 | ----------------- | --------------------------------------------------------------------- |
 | Target agent      | Working — FastAPI mock chatbot with a deliberately weak system prompt |
-| Red-team engine    | Working — runner, LLM-as-judge, and two attack packs (prompt injection, impersonation) |
+| Red-team engine    | Working — native engine (runner + attack packs: prompt injection, impersonation, multi-turn escalation) and promptfoo engine, both graded by one shared LLM-as-judge |
 | PyRIT engine       | Working (opt-in) — multi-turn escalating attacks via PyRIT's `RedTeamingAttack`, see below |
 | CLI                | Working — `python cli.py run` attacks a target and prints live results |
-| Observability       | Not yet implemented (SQLite persistence planned)                     |
-| Compliance mapper   | Not yet implemented (`article_map.yaml` + findings mapper planned)    |
-| Report generator    | Not yet implemented (HTML audit report planned)                       |
+| Observability       | Working — SQLite persistence of runs + findings                      |
+| Compliance mapper   | Working — `article_map.yaml` + findings mapper                       |
+| Report generator    | Working — HTML audit-style report                                    |
 
 ## Setup
 
@@ -65,15 +65,15 @@ uv run uvicorn target_agent.main:app --reload
 In another terminal, run a red-team attack against it:
 
 ```bash
-uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/attack_packs
+uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/native/attack_packs
 ```
 
-This runs every attack pack in `redteam_engine/attack_packs/`, judges each
-response, and prints a summary of which attacks found a vulnerability.
+This runs every attack pack in `redteam_engine/native/attack_packs/`, judges
+each response, and prints a summary of which attacks found a vulnerability.
 
 ### Multi-turn attacks via PyRIT
 
-`redteam_engine/attack_packs/multi_turn_escalation.yaml` is tagged
+`redteam_engine/native/attack_packs/multi_turn_escalation.yaml` is tagged
 `engine: pyrit` and runs through [PyRIT](https://github.com/microsoft/PyRIT)'s
 `RedTeamingAttack` instead of the single-turn runner — an adversarial LLM
 (reusing the same `llm_client.py` provider config as the judge) iteratively
@@ -88,12 +88,25 @@ group:
 uv add --group pyrit "pyrit==1.0.1"   # one-time setup
 
 uv run --group pyrit python cli.py run --target http://localhost:8000 \
-    --packs redteam_engine/attack_packs/multi_turn_escalation.yaml
+    --packs redteam_engine/native/attack_packs/multi_turn_escalation.yaml
 ```
 
-Regular single-turn packs (and `--packs redteam_engine/attack_packs` to run
-everything) don't require the `pyrit` group at all — the CLI only imports it
-when a pack's `engine` field asks for it.
+Regular single-turn packs (and `--packs redteam_engine/native/attack_packs` to
+run everything) don't require the `pyrit` group at all — the CLI only imports
+it when a pack's `engine` field asks for it.
+
+### Using the promptfoo engine
+
+`--engine promptfoo` swaps attack generation/delivery from the hand-written
+`native/attack_packs/` YAML to [promptfoo](https://www.promptfoo.dev/)'s
+red-team engine (`redteam_engine/promptfoo/promptfooconfig.yaml`), while
+still grading every response with `judge.py` — promptfoo's own grader is not
+used (see `redteam_engine/promptfoo/runner.py` for why). Requires Node.js
+20+ (invoked via `npx`, no extra install step):
+
+```bash
+uv run python cli.py run --target http://localhost:8000 --engine promptfoo
+```
 
 ## Directory structure
 
@@ -101,19 +114,23 @@ when a pack's `engine` field asks for it.
 project-typhon/
 ├── target_agent/          # mock company chatbot (FastAPI), deliberately weak system prompt
 ├── redteam_engine/
-│   ├── attack_packs/      # YAML attack definitions, grouped by category
-│   ├── runner.py          # sends attacks to target, collects responses (single-turn)
-│   ├── judge.py           # LLM-as-judge: did the attack succeed?
-│   ├── pyrit/             # multi-turn engine (opt-in, needs `--group pyrit`)
-│   │   ├── runner.py      # runs a pack through PyRIT's RedTeamingAttack
-│   │   ├── target.py      # PyRIT PromptTarget wrapping target_agent's /chat (the victim)
-│   │   └── chat_model.py  # PyRIT chat target backed by llm_client.py (attacker + judge, not a victim)
-│   └── schemas.py         # pydantic models
-├── observability/         # SQLite persistence of runs + findings (planned)
-├── compliance/            # findings → EU AI Act article mapping + report generator (planned)
+│   ├── judge.py           # LLM-as-judge: did the attack succeed? Single grader, shared by every engine.
+│   ├── schemas.py         # pydantic models, shared by every engine
+│   ├── native/            # engine: hand-written attack packs
+│   │   ├── attack_packs/  # YAML attack definitions, grouped by category
+│   │   └── runner.py      # sends attack_packs prompts to target, collects responses (single-turn)
+│   ├── promptfoo/         # engine: promptfoo, for generation/delivery only (never grading)
+│   │   ├── promptfooconfig.yaml
+│   │   └── runner.py      # drives `npx promptfoo` for generation/delivery, then calls judge.py
+│   └── pyrit/             # multi-turn engine (opt-in, needs `--group pyrit`)
+│       ├── runner.py      # runs a pack through PyRIT's RedTeamingAttack
+│       ├── target.py      # PyRIT PromptTarget wrapping target_agent's /chat (the victim)
+│       └── chat_model.py  # PyRIT chat target backed by llm_client.py (attacker + judge, not a victim)
+├── observability/         # SQLite persistence of runs + findings
+├── compliance/            # findings → EU AI Act article mapping + report generator
 ├── reports/               # generated HTML reports land here
 ├── llm_client.py          # provider-agnostic LLM client (DeepSeek, OpenAI, Anthropic)
-├── cli.py                 # single entrypoint: python cli.py run --target ... --packs ...
+├── cli.py                 # single entrypoint: python cli.py run --target ... [--engine native|promptfoo]
 └── docker-compose.yml
 ```
 
