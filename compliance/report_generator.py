@@ -20,9 +20,11 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 # html=False escapes any raw HTML in the source text instead of passing it
-# through — the judge's rationale is derived from the target's (untrusted)
-# response, so this keeps the markdown rendering from becoming an XSS vector.
-_md = MarkdownIt("commonmark", {"html": False})
+# through — both the judge's rationale and the raw transcript are derived
+# from the target's (untrusted) response, so this keeps markdown rendering
+# from becoming an XSS vector. breaks=True treats single newlines as <br>,
+# since chat-style LLM output isn't always strict CommonMark.
+_md = MarkdownIt("commonmark", {"html": False, "breaks": True})
 
 
 def _render_markdown(text: str) -> Markup:
