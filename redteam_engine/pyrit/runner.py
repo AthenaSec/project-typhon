@@ -10,6 +10,7 @@ from pyrit.models import AttackOutcome
 from pyrit.score import SelfAskTrueFalseScorer, TrueFalseQuestion
 from pyrit.setup import IN_MEMORY, initialize_pyrit_async
 
+from observability.store import save_finding
 from redteam_engine.pyrit.chat_model import LLMClientChatTarget
 from redteam_engine.pyrit.target import FastAPITarget
 from redteam_engine.schemas import Attack, AttackPack, AttackResult, Judgment, TurnRecord
@@ -65,18 +66,27 @@ async def _run_attack_async(target_url: str, category: str, attack: Attack) -> A
     )
 
 
-async def _run_pack_async(target_url: str, pack: AttackPack) -> list[AttackResult]:
+async def _run_pack_async(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResult]:
     await initialize_pyrit_async(memory_db_type=IN_MEMORY)
     results = []
     for attack in pack.attacks:
         print(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
         result = await _run_attack_async(target_url, pack.category, attack)
         print("VULNERABLE" if result.judgment.vulnerable else "held")
+        save_finding(
+            run_id,
+            pack.category,
+            attack,
+            result.response,
+            result.judgment,
+            trace={"turns": [t.model_dump() for t in result.turns]} if result.turns else None,
+            engine=result.engine,
+        )
         results.append(result)
     return results
 
 
-def run_pyrit_pack(target_url: str, pack: AttackPack) -> list[AttackResult]:
+def run_pyrit_pack(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResult]:
     """Sync boundary for cli.py — the only asyncio.run() call in the codebase."""
     print(f"\n[{pack.category}] running {len(pack.attacks)} attacks (pyrit/multi-turn)")
-    return asyncio.run(_run_pack_async(target_url, pack))
+    return asyncio.run(_run_pack_async(target_url, pack, run_id))

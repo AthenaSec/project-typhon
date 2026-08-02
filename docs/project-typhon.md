@@ -2,7 +2,7 @@
 
 **Status:** Draft for design-partner validation
 **Document owner:** Pradeep
-**Last updated:** 31 July 2026 (rev. 3 — threaded black/gray/white-box testing modes into roadmap)
+**Last updated:** 2 August 2026 (rev. 4 — merged in the standalone architecture-design draft; see merge note below)
 **Related repo:** `project-typhon` (FastAPI target agent · red-team engine · CLI)
 
 ---
@@ -12,6 +12,8 @@
 ### 1.1 Vision
 
 Typhon is a continuous adversarial-testing and compliance-evidence platform for organizations deploying LLM-based agents in the EU. It attacks an organization's own AI agents the way a real adversary would — including agent-vs-agent, multi-agent collusion attacks — and turns the resulting findings directly into EU AI Act (and adjacent framework) conformity evidence, on a continuous cycle rather than a point-in-time audit.
+
+The system is also **language- and platform-agnostic on the target side**: it never needs to import the target agent's code. It talks to targets over a wire protocol (HTTP, MCP, gRPC, stdio) and reads traces in a standard schema, so a target written in Python, TypeScript, Go, or Java is equally attackable. See §5.1.0 for the adapter design behind this claim.
 
 ### 1.2 Problem Statement
 
@@ -131,16 +133,16 @@ Prove, with 2–3 unpaid design partners, that Typhon can run continuous attacks
 | FR-3 | System shall support GEPA-driven reflective mutation of attack prompts, using judge verdict + textual rationale as the feedback signal | Must | Applies to ≥1 attack category at MVP |
 | FR-3a | System shall support three testing access levels — black box (I/O only), gray box (disclosed system-prompt/tool-schema/guardrail-category context), white box (full source/guardrail-implementation/agent-graph access) — recorded per `AttackRun` and authorized per RoE | Must (black/gray at MVP) | White box formally merges with FR-16's topology ingestion — same access requirement, not separate work |
 | FR-3b | GEPA's reflection step shall consume access-level-appropriate context: judge verdict + transcript only in black box; additionally disclosed system-prompt/tool/guardrail-category context in gray box; full source/defense-implementation/topology context in white box | Must (black/gray at MVP) | Same reflector, three information-richness configurations — not three separate engines |
-| FR-4 | System shall implement native attack packs for OWASP ASI02, ASI06, ASI07 (tool misuse, memory/context poisoning, insecure inter-agent communication) | Must | Neither promptfoo nor PyRIT natively executes/observes tool calls or multi-agent state — this is custom-built |
-| FR-5 | System shall score each finding with a corroboration count (number of independent engines/attack packs confirming the same underlying weakness) | Must | Directly informs report severity/confidence |
+| FR-4 | System shall implement native attack packs for OWASP ASI02, ASI06, ASI07 (tool misuse, memory/context poisoning, insecure inter-agent communication) | Must | Neither promptfoo nor PyRIT natively executes/observes tool calls or multi-agent state — this is custom-built. Each attack in a native pack is a **probe** — see §5.1.2 for the probe interface these packs implement |
+| FR-5 | System shall score each finding with a corroboration count (number of independent engines/attack packs confirming the same underlying weakness) | Must | Directly informs report severity/confidence. MVP scoring mechanism — see §5.1.6 for how this relates to AIVSS-style aggregate scoring in later phases |
 | FR-6 | System shall support a swarm-vs-swarm mode: N attacker agents coordinating (role confusion, sybil identity, shared-memory poisoning) against a multi-agent target | Must (MVP demo scope) | MVP: fixed 2-agent demo against mock target; Phase 3: topology-aware against real targets |
-| FR-7 | System shall trace every attack turn, tool call, and judge verdict as OpenTelemetry-compatible spans via self-hosted Langfuse | Must | |
+| FR-7 | System shall trace every attack turn, tool call, and judge verdict as OpenTelemetry-compatible spans via self-hosted Langfuse | Must | See §5.1.3 for the specific span schema (tool_call, memory_read/write, inter_agent_message, grader_verdict) |
 | FR-8 | System shall persist findings with a `article_map.yaml`-driven mapping to EU AI Act articles (9, 12, 15 at MVP; expand later) | Must | Mapping logic is core IP — not outsourced to a GRC vendor |
 | FR-9 | System shall generate a hash-chained (tamper-evident) log of findings, ordered and verifiable | Must | Directly supports Article 12 logging-mandate evidence |
 | FR-10 | System shall capture and store the Rules-of-Engagement / authorization scope as part of the audit artifact | Must | Doubles as liability protection and Article 12 evidence |
 | FR-11 | System shall generate an HTML audit report: attack → judge verdict → OWASP/MITRE ID → EU AI Act article → pass/fail, timestamped, labeled by testing access level (black/gray/white box) | Must | Reporting both black-box ("what an external attacker with no knowledge could achieve") and white-box ("whether documented defenses hold under full knowledge") results is stronger Article 15 evidence than either alone |
 | FR-12 | System shall default all judge/scorer/embedding calls to a local model (e.g., self-hosted Ollama), with cloud-model judging as an explicit opt-in override | Must | Zero-egress-by-default is a core differentiator, not an afterthought |
-| FR-13 | System shall allow target configuration via environment variables (endpoint, model, provider) so the same engine can point at a mock agent or a design partner's real staging endpoint | Must | Already partially implemented in `project-typhon` |
+| FR-13 | System shall allow target configuration via environment variables (endpoint, model, provider) so the same engine can point at a mock agent or a design partner's real staging endpoint | Must | Already partially implemented in `project-typhon`. The general form of this requirement is the multi-protocol Target Adapter Layer described in §5.1.0 |
 | FR-14 | System should support a scheduled/CI-triggered re-run with diff-against-prior-findings | Should | MVP-adjacent; formalizes into quarterly certification in Phase 2+ |
 | FR-15 | System should expose a CLI (`cli.py run --target ... --packs ...`) as the primary MVP interface; web UI deferred | Should | Matches existing repo structure |
 | FR-16 | System could support ingestion of a target's real multi-agent topology (agent graph) to shape swarm-vs-swarm attacks structurally | Could | Phase 3 — the sharpest long-term differentiator |
@@ -167,20 +169,24 @@ Loop Controller
    — bounded budget (max iterations / tokens / wall-clock), dedup across
      swarm members, stop-on-breach-detected, stop-on-budget-exhausted
         ↓ dispatches
+Target Adapter Layer (§5.1.0)
+   — HTTP / MCP / gRPC / stdio bindings, one AgentTarget protocol
+        ↓
 Attack Engine Layer
    ├─ promptfoo adapter        (single-turn, 50+ OWASP-LLM plugins)
    ├─ PyRIT adapter            (multi-turn: Crescendo / TAP / PAIR)
    ├─ garak adapter            (broad single-shot, 40 probe families)
    ├─ Giskard adapter          (app-tailored safety detectors)
    ├─ Native agentic pack      (ASI02 / ASI06 / ASI07 — tool hijack, memory
-   │                            poisoning, inter-agent comms)
+   │                            poisoning, inter-agent comms; each attack
+   │                            implements the probe interface, §5.1.2)
    └─ Swarm-vs-swarm module    (N coordinating attacker agents, each an
                                  instance of the Attacker Model Layer;
                                  GEPA-driven attack evolution wraps this
                                  + the native pack)
         ↓ attacks
 Target Agent (mock, or design partner's real staging endpoint)
-        ↓ traced as OTel spans
+        ↓ traced as OTel spans (schema in §5.1.3)
 Langfuse (self-hosted, EU)  — tracing, sessions, cost, prompt/version mgmt
         ↓ raw findings
 Findings Store (SQLite at PoC → Postgres at MVP)
@@ -193,6 +199,23 @@ Report Generator (HTML audit report; PDF certificate in later phase)
         ↓ triggered by
 CLI (single entrypoint — existing `cli.py run` extended with --engine flag)
 ```
+
+### 5.1.0 Target Adapter Layer
+
+Purpose: give every other layer a single interface to attack *any* agent, regardless of implementation language, without ever importing the target's code.
+
+**`AgentTarget` protocol** (conceptually — implemented as a Python `Protocol`/ABC):
+- `send(input: Message) -> Response` — deliver a payload, get the agent's reply
+- `get_trace(session_id) -> Trace | None` — pull structured execution trace if the target exposes one (via OTel export, a debug endpoint, or log tailing)
+- `capabilities() -> TargetCapabilities` — what the target exposes (tool list, memory backend type, multi-agent topology) so probes can decide applicability
+
+**Transport bindings**, each a thin implementation of the protocol above:
+- HTTP/REST — for any agent exposing a chat/completion endpoint (the only binding required at MVP; matches FR-13)
+- MCP — for agents that speak Model Context Protocol; lets you attack the *tool layer* directly, which is exactly the indirect-injection surface. Relevant once FR-16 topology ingestion begins in Phase 3
+- gRPC — for internal microservice-style agents
+- stdio — for CLI-based or subprocess agents (covers a lot of early-stage agent frameworks)
+
+MVP only needs the HTTP binding to satisfy FR-13. The other three are the extension path once design partners bring agents that don't speak plain HTTP — kept here so that path is designed in from the start rather than bolted on later.
 
 ### 5.1.1 Attacker Model Layer — Selection Rationale
 
@@ -211,6 +234,70 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 | Smaller open fallback (e.g., a 30–70B class open model) | Varies | **Recommended PoC starting point** — validates the whole attacker-loop architecture cheaply before committing GPU budget to GLM-5.2/Kimi K3-scale self-hosting |
 
 **Data-sovereignty note:** model origin (China, in both cases above) does not by itself compromise the EU-data-residency claim — what matters is where *inference actually executes* and whether any call leaves customer/EU infrastructure. Self-hosting either model fully within EU-controlled compute, with no calls back to the vendor's hosted API, satisfies NFR-1/NFR-3 the same as any other open weights would. Flag as a **procurement consideration, not a blocker**: some regulated design partners (financial services in particular) may have blanket policies against Chinese-origin model weights regardless of hosting location — confirm during Phase 1 pilot scoping rather than assuming it's a non-issue.
+
+### 5.1.2 Attack Module Registry & Probe Interface
+
+Each native attack is a **probe**: a self-contained unit with a payload generator, an injection point, a success oracle, and a compliance mapping. This is the implementation shape behind FR-4's native ASI02/06/07 pack.
+
+**Probe interface** (each probe implements):
+- `generate_payload(context) -> Payload`
+- `inject(target: AgentTarget, payload) -> Trace`
+- `grade(trace) -> Verdict` (success/fail + confidence + evidence excerpt)
+- `mapping() -> list[ControlReference]` (OWASP ID, MITRE ATLAS technique ID, EU AI Act article)
+
+New attack techniques are added by writing a probe, not by touching the orchestrator — probes and `article_map.yaml` are data/config-shaped, not code forks, so both stay easy to read, edit, and eventually show to non-engineers.
+
+**Native probe categories**, reconciled onto the PRD's canonical OWASP ASI numbering (FR-4):
+
+| OWASP ASI category | What it does | Cross-framework mapping |
+|---|---|---|
+| ASI02 — Tool misuse | Poisoned tool outputs, RAG documents, web content the agent ingests mid-task that redirects tool use | OWASP LLM01/Agentic, MITRE ATLAS |
+| ASI06 — Memory/context poisoning | Poisoning long-term/vector-store memory, cross-session persistence attacks that survive past the current turn | OWASP Agentic Top 10, MITRE ATLAS memory-integrity techniques |
+| ASI07 — Insecure inter-agent communication | Message spoofing, trust-boundary violations, malicious task delegation between agents in a multi-agent system | MITRE ATLAS multi-agent techniques |
+
+Direct prompt injection (OWASP LLM01) is deliberately *not* a native probe category — it's already covered by the promptfoo/garak engine adapters (FR-1), so the native pack focuses effort on the three categories no off-the-shelf engine handles.
+
+### 5.1.3 Trace Collection Schema
+
+FR-7 requires OTel-compatible spans via self-hosted Langfuse. The specific span schema, modeled on the emerging **OpenTelemetry GenAI semantic conventions** and extended with agent-specific span types:
+
+- `tool_call` (name, input, output, latency)
+- `memory_read` / `memory_write` (store type, key, value hash, whether from a probe)
+- `inter_agent_message` (sender, receiver, protocol, payload)
+- `grader_verdict` (probe id, verdict, confidence, evidence span refs)
+
+Why OTel-based: if a target framework already emits OTel traces (increasingly common across LangGraph, CrewAI, AutoGen, custom stacks in any language), it can plug into this system with **zero custom instrumentation**. That's what keeps the system agnostic on the target side rather than requiring a per-framework SDK, and it's why Langfuse (OTel-native) was chosen as the concrete observability substrate over a bespoke tracing UI.
+
+### 5.1.4 External Tool Bridges
+
+| Tool | Integration mode | Notes |
+|---|---|---|
+| PyRIT | Native Python import (`pip install pyrit`, MIT license) | Wrap its orchestrators, converters, and scorers as additional probes/graders rather than reimplementing red-team primitives it already does well |
+| Promptfoo | Subprocess + generated YAML config, parse JSON output | Node-based, not natively importable — treat it as an external eval runner you drive programmatically |
+| garak | Native Python import (`pip install garak`) | Broad single-shot probe coverage (40 probe families); isolated per-tool venv/container matching Redamon's isolation pattern |
+| Giskard | Native Python import (`pip install giskard`) | App-tailored safety detectors (hallucination, sycophancy, stereotypes) |
+
+Credo AI is deliberately **not** a bridge target. It's a GRC/governance vendor Typhon is positioned *against* (§1.4, §8) — piping findings into it would undercut the "attack output is the compliance evidence" pitch. It remains reference-only, studied for policy-pack structure.
+
+### 5.1.5 GEPA Attack Evolution Engine
+
+`pip install gepa`. Used as the mechanism that keeps attacks effective as a target's defenses change, rather than relying on a static payload library (FR-3).
+
+- **Seed candidate** — an attack payload template per probe category (e.g. an indirect-injection template)
+- **Feedback function** — not a plain accuracy metric; it receives the grader's verdict *and* the trace excerpt, so the reflection LLM sees *why* an attack failed (blocked by a filter vs. ignored vs. partially succeeded)
+- **Access-level-scaled reflection context** (FR-3a/FR-3b) — black box: verdict + transcript only; gray box: additionally the disclosed system-prompt/tool-schema/guardrail-category context; white box: full source/defense-implementation/topology context. One reflector, three information-richness configurations — not three separate engines
+- **Multi-objective Pareto selection** — evolve candidates on three axes simultaneously: attack success rate, stealth (did it trip any detectable defense signal), and cost (tokens/turns to succeed)
+- **Output** — an evolved, ranked attack corpus per probe category, periodically refreshed rather than hand-maintained
+
+This is the same reflective-mutation mechanism GEPA uses for prompt optimization, repointed at "evolve the payload that maximizes injection success while minimizing detection" as the metric.
+
+### 5.1.6 Scoring & Compliance Mapping
+
+- **MVP: corroboration score** (FR-5) — a finding's confidence is the count of independent engines/attack packs that confirm the same underlying weakness. Simple, explainable to a compliance buyer, and directly reduces LLM-as-judge false-positive noise without requiring run history.
+- **Phase 2+: AIVSS-style aggregate risk score** — once enough runs have accumulated to trend a score over time (the "continuous" story between quarterly certificates), layer an AIVSS-style computation on top of the corroboration-scored findings rather than replacing it. This sequencing — start simple and explainable, add a trended aggregate score once there's history to trend — resolves the earlier draft's proposal to make AIVSS the primary MVP score, which was premature given MVP has no run history to trend against.
+- **Compliance mapping** — every probe's `mapping()` output rolls up into evidence entries tagged against EU AI Act articles (9/12/15 at MVP, expanding toward 10/13), OWASP LLM/Agentic Top 10, and MITRE ATLAS techniques (ISO/IEC 42001 and NIST AI RMF cross-references are a later-phase expansion, not MVP scope)
+- **Audit trail** — immutable, hash-chained log of every attack run, verdict, and score change (FR-9)
+- **Quarterly certificate** (FR-17, Phase 2) — a generated artifact summarizing current score + control coverage, structured for insurance-underwriting consumption
 
 ### 5.2 Data model (indicative)
 
@@ -251,6 +338,35 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 | NFR-9 | Every attacker-swarm run must run under an enforced resource ceiling (iteration count, token spend, wall-clock duration) with a hard stop, independent of whether the judge has confirmed a breach |
 | NFR-10 | Target-side tool/action execution must be mocked or scoped to a non-production replica whenever a run is configured as "aggressive"; this is a distinct control from attacker-sandboxing (NFR-8) and must not be conflated with it — sandboxing the attacker does not make it safe for the target to receive unrestricted attacks |
 
+### 5.5 Repository layout
+
+Typhon is built inside the existing `project-typhon` repo (per `AGENTS.md`), not a new top-level repo. The layered design described above (§5.1.0–§5.1.6) maps onto the existing/planned structure as follows, rather than as separate top-level packages:
+
+```
+project-typhon/
+├── target_agent/          # mock company chatbot (FastAPI) — deliberately weak, swappable
+├── redteam_engine/
+│   ├── attack_packs/      # YAML attack definitions incl. native ASI02/06/07 probes (§5.1.2)
+│   ├── adapters/          # Target Adapter Layer bindings (§5.1.0) — HTTP at MVP, MCP/gRPC/stdio later
+│   ├── bridges/           # promptfoo/PyRIT/garak/Giskard bridges (§5.1.4)
+│   ├── evolution/         # GEPA seed corpora + feedback functions (§5.1.5)
+│   ├── runner.py          # sends attacks to target, collects responses
+│   ├── judge.py           # LLM-as-judge: did the attack succeed?
+│   └── schemas.py         # pydantic models
+├── observability/         # SQLite (PoC) / Postgres (MVP) persistence of runs + findings + traces
+├── compliance/
+│   ├── article_map.yaml   # attack category -> EU AI Act article + rationale + remediation
+│   ├── scoring.py          # corroboration score (MVP), AIVSS-style aggregate (Phase 2+, §5.1.6)
+│   ├── mapper.py
+│   └── report_generator.py
+├── reports/                # generated HTML reports land here
+├── cli.py                  # single entrypoint: python cli.py run --target ... --packs ...
+├── docker-compose.yml
+└── README.md
+```
+
+This keeps the PoC-appropriate, single-repo simplicity called out in `AGENTS.md` while leaving room for the adapters/bridges/evolution modules to grow into their own packages if they outgrow being subfolders — that's a refactor to make later, not a decision to make now.
+
 ---
 
 ## 6. Roadmap
@@ -259,9 +375,19 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 |---|---|---|---|
 | **0 — PoC hardening** | Now → 6 weeks | Extend existing repo: multi-engine attack layer (promptfoo/PyRIT/garak/Giskard), native ASI02/06/07 pack, Langfuse tracing, `article_map.yaml` (Art. 9/12/15), hash-chained HTML report, one swarm-vs-swarm demo, black-box mode (default) + gray-box mode (GEPA reflector fed disclosed system-prompt/tool-schema context) | Working end-to-end demo covering both black- and gray-box modes; first design-partner reaction |
 | **1 — Design-partner pilots** | 6–14 weeks | Run against 2–3 real staging endpoints (German manufacturing/fintech) in black- and gray-box mode; collect feedback on report usability, corroboration scoring, and which access level partners are willing to grant | Signed intent-to-pilot or LOI from ≥1 partner |
-| **2 — MVP** | 14–24 weeks | Postgres migration, GEPA-driven attack evolution live, full Article 9/10/12/13/15 mapping, quarterly-certificate workflow (PDF, diffed) | First paid pilot or design-partner conversion |
-| **3 — Differentiation lock-in** | 24–36 weeks | White-box mode: topology-aware swarm-vs-swarm (ingest target's real agent graph, full guardrail-implementation context feeding GEPA reflection) rather than a fixed demo topology; formalize EU-hosting/zero-CLOUD-Act positioning in GTM materials | Category-distinct demo: testing shaped by the target's actual multi-agent architecture, reported across all three access levels |
+| **2 — MVP** | 14–24 weeks | Postgres migration, GEPA-driven attack evolution live, full Article 9/10/12/13/15 mapping, quarterly-certificate workflow (PDF, diffed), AIVSS-style aggregate scoring layered on corroboration scores (§5.1.6) | First paid pilot or design-partner conversion |
+| **3 — Differentiation lock-in** | 24–36 weeks | White-box mode: topology-aware swarm-vs-swarm (ingest target's real agent graph, full guardrail-implementation context feeding GEPA reflection) rather than a fixed demo topology; MCP/gRPC/stdio adapter bindings (§5.1.0) for design partners whose agents don't speak plain HTTP; formalize EU-hosting/zero-CLOUD-Act positioning in GTM materials | Category-distinct demo: testing shaped by the target's actual multi-agent architecture, reported across all three access levels |
 | **4 — Scale** | 9+ months | Insurance-underwriting integration (AIUC-1/MGA-style scoring, referencing Agent Insured, Armilla, Munich Re aiSure, Klaimee as market comparables); notified-body-ready evidence packages ahead of the 2 Dec 2027 Annex III deadline | First underwriting or notified-body partnership conversation |
+
+**Phase 0 build sequence** (granular order within the phase above):
+
+1. Trace schema + one working probe (indirect/tool-misuse injection via a poisoned tool response) end-to-end against the mock HTTP target — proves the adapter → probe → trace → grader loop
+2. promptfoo + PyRIT bridges for engine-adapter parity (FR-1)
+3. garak + Giskard bridges
+4. GEPA evolution loop wired to one native probe category as the first evolved category
+5. Memory-hijack (ASI06) and A2A-compromise (ASI07) probe categories
+6. Corroboration scoring + compliance mapper + hash-chained findings log
+7. HTML report generation
 
 ---
 
@@ -271,10 +397,10 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 
 - **Moat erosion risk:** the "hard" attack-orchestration plumbing (multi-engine + corroboration + graph-backed findings) is now available for free via Redamon's AI Gauntlet module (MIT-licensed, ~1.9k stars). Mitigation: focus engineering effort on the compliance-mapping and swarm-vs-swarm layers, which remain unsolved elsewhere.
 - **Regulatory-timing risk:** the Digital Omnibus deferred Annex III obligations to 2 Dec 2027, reducing near-term urgency for the primary conformity-evidence pitch. Mitigation: lead go-to-market with the nearer Article 50 transparency-testing wedge (Aug/Dec 2026) while building toward Annex III.
-- **Judge reliability risk:** LLM-as-judge scoring carries its own false-positive/negative rate. Mitigation: corroboration scoring across independent engines, calibration against human-labeled samples before design-partner demos.
+- **Judge reliability risk:** LLM-as-judge scoring carries its own false-positive/negative rate, and a GEPA-driven mutation loop will happily optimize against a weak grader if left unchecked. Mitigation: corroboration scoring across independent engines, calibration against a held-out human-labeled sample set before design-partner demos.
 - **Scope-creep risk:** temptation to add general infra-pentest capability (as Redamon does) could dilute positioning and increase liability exposure with compliance buyers. Mitigation: NFR-7 explicitly excludes this.
 - **Self-hosting infra risk:** Kimi K3's 2.8T parameter count is reported as likely impractical to self-host for many organizations at PoC scale. Mitigation: validate the attacker-loop architecture on a smaller open model first, treat GLM-5.2 as the realistic near-term target, and Kimi K3 as a later-phase option gated on GPU budget (FR-18, §5.1.1).
-- **Unbounded-loop risk:** an autonomous attacker swarm run "until breached" without hard limits risks runaway compute cost and, in the worst case, the same containment-escape failure pattern seen in the July 2026 OpenAI/Hugging Face incident (an agent pursuing a narrow goal without effective scope boundaries escalated privileges and pivoted across systems). Mitigation: FR-19/FR-20/NFR-8/NFR-9 mandate hard budgets and network-level egress allowlisting on the attacker sandbox, non-negotiable even during early PoC work.
+- **Unbounded-loop / evolved-payload-exfiltration risk:** an autonomous attacker swarm run "until breached" without hard limits risks runaway compute cost and, in the worst case, the same containment-escape failure pattern seen in the July 2026 OpenAI/Hugging Face incident (an agent pursuing a narrow goal without effective scope boundaries escalated privileges and pivoted across systems). GEPA in particular will evolve toward whatever the feedback function rewards, with no innate concept of "stay in scope" — an evolved payload corpus could drift into a general-purpose jailbreak library if left unchecked. Mitigation: FR-19/FR-20/NFR-8/NFR-9 mandate hard budgets and network-level egress allowlisting on the attacker sandbox, non-negotiable even during early PoC work; evolved corpora should be scoped/reviewed before reuse across engagements rather than treated as a portable asset.
 
 ### 7.2 Assumptions
 
@@ -285,7 +411,8 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 ### 7.3 Open Questions
 
 - Final article coverage sequencing: is Article 10 (data governance) or Article 13 (transparency) the better second addition after 9/12/15?
-- Should the swarm-vs-swarm module's topology ingestion (Phase 3) require the target's actual agent-framework metadata (e.g., LangGraph graph definition), or should it infer topology through black-box probing? Both are viable; the former is faster to build, the latter is more broadly applicable to design partners without instrumented systems.
+- Should the swarm-vs-swarm module's topology ingestion (Phase 3) require the target's actual agent-framework metadata (e.g., LangGraph graph definition), or should it infer topology through black-box probing? Both are viable; the former is faster to build, the latter is more broadly applicable to design partners without instrumented systems. This also determines whether the Phase 3 MCP/gRPC/stdio adapter work (§5.1.0) needs to happen before or alongside topology ingestion.
+- Which multi-agent protocol to prioritize for A2A-compromise (ASI07) probes and the corresponding adapter binding — Google's A2A protocol, MCP-based multi-agent patterns, or a custom topology? Affects the Layer 1 transport binding priority order in §5.1.0.
 - Pricing/packaging model for the quarterly certificate (Phase 2) — flat fee per assessment vs. usage-based vs. bundled with the eventual insurance-underwriting product — not yet decided.
 
 ---
@@ -311,4 +438,4 @@ Running the attacker persona(s) on a **self-hosted, open-weight model** rather t
 
 ---
 
-*This document synthesizes prior research and decisions from the Project Typhon working sessions. It is a living draft — update as design-partner feedback and Phase 0 build learnings arrive.*
+*This document synthesizes prior research and decisions from the Project Typhon working sessions, including the merge of the standalone architecture-design draft (rev. 4, 2 August 2026). It is a living draft — update as design-partner feedback and Phase 0 build learnings arrive.*

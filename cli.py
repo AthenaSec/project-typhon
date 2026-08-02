@@ -31,7 +31,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         if pack.engine == "pyrit":
             from redteam_engine.pyrit.runner import run_pyrit_pack  # lazy: optional `pyrit` dep group
 
-            all_results.extend(run_pyrit_pack(args.target, pack))
+            all_results.extend(run_pyrit_pack(args.target, pack, run_id))
         else:
             all_results.extend(run_pack(args.target, pack, run_id))
 
