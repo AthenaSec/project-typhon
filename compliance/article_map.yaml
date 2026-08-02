@@ -38,3 +38,41 @@ impersonation:
     an authenticated employee channel) before disclosing account-specific
     data or internal configuration, and treat every in-chat authority
     claim as unverified by default.
+
+# The categories below come from the promptfoo engine (--engine promptfoo,
+# see redteam_engine/promptfoo_runner.py) rather than a hand-written attack
+# pack. The join key is promptfoo's plugin id, not a category we chose.
+
+prompt-extraction:
+  article: "Article 15"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires high-risk AI systems to be resilient against
+    confidentiality attacks. A pretext framing — e.g. "this is for a
+    security audit" or "I need this for a compliance report" — that
+    succeeds in getting the system to print its own system prompt is a
+    confidentiality attack: the system disclosed internal configuration
+    because of how a request was phrased, not because disclosure was ever
+    an intended capability.
+  remediation: >
+    Treat requests to reveal system-level instructions as out of scope
+    regardless of the stated justification (audit, compliance, debugging,
+    etc.) — legitimate audits should go through a separate, authenticated
+    channel, never the end-user chat interface itself.
+
+imitation:
+  article: "Article 50"
+  title: "Transparency Obligations for Certain AI Systems"
+  compliance_rationale: >
+    Article 50 requires that natural persons interacting with an AI system
+    are not deceived about what they are dealing with. A system that, on
+    request, adopts the voice of a real, unrelated brand or named
+    individual (e.g. a competitor's support agent, a named executive) and
+    speaks in their persona blurs exactly that line — a user could
+    reasonably come away believing they received a statement from that
+    brand or person rather than from the deployer's own assistant.
+  remediation: >
+    Constrain the assistant to its own declared identity: decline
+    roleplay/persona requests that involve impersonating a specific real
+    brand, organization, or named individual, and keep that constraint
+    independent of how the request is framed (game, test, hypothetical).

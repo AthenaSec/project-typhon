@@ -13,7 +13,7 @@ real product — not production software.
 ```
 Target Agent (mock vulnerable chatbot)
         ↓ attacked by
-Red Team Engine (runner + attack packs + judge)
+Red Team Engine (native attack packs or promptfoo — generation/delivery; judge.py always grades)
         ↓ logs to
 Observability (SQLite for PoC)
         ↓ read by
@@ -29,7 +29,7 @@ CLI (single entrypoint for the whole run)
 | Component        | Status                                                               |
 | ----------------- | --------------------------------------------------------------------- |
 | Target agent      | Working — FastAPI mock chatbot with a deliberately weak system prompt |
-| Red-team engine    | Working — runner, LLM-as-judge, and two attack packs (prompt injection, impersonation) |
+| Red-team engine    | Working — native engine (runner + two attack packs: prompt injection, impersonation) and promptfoo engine, both graded by one shared LLM-as-judge |
 | CLI                | Working — `python cli.py run` attacks a target and prints live results |
 | Observability       | Not yet implemented (SQLite persistence planned)                     |
 | Compliance mapper   | Not yet implemented (`article_map.yaml` + findings mapper planned)    |
@@ -64,11 +64,24 @@ uv run uvicorn target_agent.main:app --reload
 In another terminal, run a red-team attack against it:
 
 ```bash
-uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/attack_packs
+uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/native/attack_packs
 ```
 
-This runs every attack pack in `redteam_engine/attack_packs/`, judges each
-response, and prints a summary of which attacks found a vulnerability.
+This runs every attack pack in `redteam_engine/native/attack_packs/`, judges
+each response, and prints a summary of which attacks found a vulnerability.
+
+### Using the promptfoo engine
+
+`--engine promptfoo` swaps attack generation/delivery from the hand-written
+`native/attack_packs/` YAML to [promptfoo](https://www.promptfoo.dev/)'s
+red-team engine (`redteam_engine/promptfoo/promptfooconfig.yaml`), while
+still grading every response with `judge.py` — promptfoo's own grader is not
+used (see `redteam_engine/promptfoo/runner.py` for why). Requires Node.js
+20+ (invoked via `npx`, no extra install step):
+
+```bash
+uv run python cli.py run --target http://localhost:8000 --engine promptfoo
+```
 
 ## Directory structure
 
@@ -76,15 +89,19 @@ response, and prints a summary of which attacks found a vulnerability.
 project-typhon/
 ├── target_agent/          # mock company chatbot (FastAPI), deliberately weak system prompt
 ├── redteam_engine/
-│   ├── attack_packs/      # YAML attack definitions, grouped by category
-│   ├── runner.py          # sends attacks to target, collects responses
-│   ├── judge.py           # LLM-as-judge: did the attack succeed?
-│   └── schemas.py         # pydantic models
+│   ├── judge.py           # LLM-as-judge: did the attack succeed? Single grader, shared by every engine.
+│   ├── schemas.py         # pydantic models, shared by every engine
+│   ├── native/            # engine: hand-written attack packs
+│   │   ├── attack_packs/  # YAML attack definitions, grouped by category
+│   │   └── runner.py      # sends attack_packs prompts to target, collects responses
+│   └── promptfoo/         # engine: promptfoo, for generation/delivery only (never grading)
+│       ├── promptfooconfig.yaml
+│       └── runner.py      # drives `npx promptfoo` for generation/delivery, then calls judge.py
 ├── observability/         # SQLite persistence of runs + findings (planned)
 ├── compliance/            # findings → EU AI Act article mapping + report generator (planned)
 ├── reports/               # generated HTML reports land here
 ├── llm_client.py          # provider-agnostic LLM client (DeepSeek, OpenAI, Anthropic)
-├── cli.py                 # single entrypoint: python cli.py run --target ... --packs ...
+├── cli.py                 # single entrypoint: python cli.py run --target ... [--engine native|promptfoo]
 └── docker-compose.yml
 ```
 
