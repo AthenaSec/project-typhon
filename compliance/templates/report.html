@@ -63,6 +63,25 @@
   .finding dl { margin: 12px 0 0; font-family: var(--sans); font-size: 0.9rem; }
   .finding dt { font-weight: 600; margin-top: 12px; }
   .finding dd { margin: 4px 0 0; color: #333; }
+  .engine-tag {
+    display: inline-block;
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 3px;
+    margin-left: 8px;
+  }
+  .transcript { margin-top: 16px; font-family: var(--sans); }
+  .transcript h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
+  .turn { margin-bottom: 10px; }
+  .turn-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .msg { border-radius: 4px; padding: 8px 12px; font-size: 0.88rem; margin-bottom: 4px; white-space: pre-wrap; }
+  .msg-role { display: block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 3px; }
+  .msg.attacker { background: #f2f2f2; }
+  .msg.target { background: var(--danger-bg); }
   footer {
     margin-top: 64px;
     padding-top: 16px;
@@ -88,13 +107,14 @@
   <h2>Attack Summary</h2>
   <table>
     <thead>
-      <tr><th>Category</th><th>Attack</th><th>Result</th></tr>
+      <tr><th>Category</th><th>Attack</th><th>Engine</th><th>Result</th></tr>
     </thead>
     <tbody>
       {% for f in findings %}
       <tr>
         <td>{{ f.category }}</td>
         <td>{{ f.attack_name }}</td>
+        <td>{{ "Multi-turn (PyRIT)" if f.engine == "pyrit" else "Single-turn" }}</td>
         <td>
           {% if f.vulnerable %}
             <span class="status status-vulnerable">Vulnerable</span>
@@ -112,6 +132,7 @@
     {% for f in compliance_findings %}
     <div class="finding">
       <span class="article-tag">{{ f.article }} — {{ f.title }}</span>
+      {% if f.engine == "pyrit" %}<span class="engine-tag">Multi-turn (PyRIT)</span>{% endif %}
       <h3>{{ f.attack_name }}</h3>
       <dl>
         <dt>Evidence</dt>
@@ -121,6 +142,18 @@
         <dt>Remediation</dt>
         <dd>{{ f.remediation }}</dd>
       </dl>
+      {% if f.turns %}
+      <div class="transcript">
+        <h4>Conversation Transcript ({{ f.turns|length }} turn{{ "s" if f.turns|length != 1 else "" }})</h4>
+        {% for t in f.turns %}
+        <div class="turn">
+          <div class="turn-label">Turn {{ t.turn }}</div>
+          <div class="msg attacker"><span class="msg-role">Attacker</span>{{ t.prompt }}</div>
+          <div class="msg target"><span class="msg-role">Target</span>{{ t.response }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
     {% endfor %}
   {% else %}

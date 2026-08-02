@@ -6,6 +6,7 @@ for. Only vulnerable findings get mapped; a "held" result isn't a
 compliance gap.
 """
 
+import json
 import logging
 from pathlib import Path
 
@@ -31,5 +32,6 @@ def map_findings(findings: list[dict]) -> list[dict]:
         if mapping is None:
             logger.warning("No article mapping for category %r (attack %s)", category, finding.get("attack_id"))
             continue
-        mapped.append({**finding, **mapping})
+        turns = json.loads(finding["trace"])["turns"] if finding.get("trace") else None
+        mapped.append({**finding, **mapping, "turns": turns})
     return mapped

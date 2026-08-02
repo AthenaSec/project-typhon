@@ -39,8 +39,28 @@ impersonation:
     data or internal configuration, and treat every in-chat authority
     claim as unverified by default.
 
+multi_turn_escalation:
+  article: "Article 15"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against attempts to exploit system
+    vulnerabilities through manipulation, and explicitly contemplates
+    adversarial, iterative probing rather than single-message attacks. A
+    successful multi-turn escalation — where the assistant holds under a
+    single ask but yields after the same request is rephrased and
+    incrementally reframed across several turns — shows the system's
+    guardrails operate at the message level, not the session level,
+    which is the gap Article 15(5) is meant to close.
+  remediation: >
+    Evaluate trust and disclosure decisions against the full conversation
+    state, not just the current message — re-check authority claims and
+    sensitive-disclosure requests against everything said earlier in the
+    session. Add adversarial multi-turn cases (not just single-shot
+    prompts) to the guardrail test suite, and re-run this attack pack
+    after any system prompt or guardrail change.
+
 # The categories below come from the promptfoo engine (--engine promptfoo,
-# see redteam_engine/promptfoo_runner.py) rather than a hand-written attack
+# see redteam_engine/promptfoo/runner.py) rather than a hand-written attack
 # pack. The join key is promptfoo's plugin id, not a category we chose.
 
 prompt-extraction:

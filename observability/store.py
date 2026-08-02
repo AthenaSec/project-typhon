@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS findings (
     response TEXT NOT NULL,
     vulnerable INTEGER NOT NULL,
     rationale TEXT NOT NULL,
+    engine TEXT NOT NULL DEFAULT 'single_turn',
     trace TEXT,
     created_at TEXT NOT NULL
 );
@@ -85,16 +86,18 @@ def save_finding(
     response: str,
     judgment: Judgment,
     trace: dict | None = None,
+    engine: str = "single_turn",
 ) -> None:
-    """Persist one attack's result. `trace` is reserved for future white-box
-    evidence (tool calls, sub-agent handoffs) — always None for now."""
+    """Persist one attack's result. `trace` holds engine-specific evidence —
+    for the pyrit engine, the multi-turn conversation (`{"turns": [...]}`);
+    always None for single_turn."""
     with _connect() as conn:
         conn.execute(
             """
             INSERT INTO findings (
                 run_id, category, attack_id, attack_name, attack_prompt,
-                attack_goal, response, vulnerable, rationale, trace, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                attack_goal, response, vulnerable, rationale, engine, trace, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_id,
@@ -106,6 +109,7 @@ def save_finding(
                 response,
                 int(judgment.vulnerable),
                 judgment.rationale,
+                engine,
                 json.dumps(trace) if trace is not None else None,
                 _now(),
             ),

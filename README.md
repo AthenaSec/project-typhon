@@ -29,11 +29,12 @@ CLI (single entrypoint for the whole run)
 | Component        | Status                                                               |
 | ----------------- | --------------------------------------------------------------------- |
 | Target agent      | Working — FastAPI mock chatbot with a deliberately weak system prompt |
-| Red-team engine    | Working — native engine (runner + two attack packs: prompt injection, impersonation) and promptfoo engine, both graded by one shared LLM-as-judge |
+| Red-team engine    | Working — native engine (runner + attack packs: prompt injection, impersonation, multi-turn escalation) and promptfoo engine, both graded by one shared LLM-as-judge |
+| PyRIT engine       | Working (opt-in) — multi-turn escalating attacks via PyRIT's `RedTeamingAttack`, see below |
 | CLI                | Working — `python cli.py run` attacks a target and prints live results |
-| Observability       | Not yet implemented (SQLite persistence planned)                     |
-| Compliance mapper   | Not yet implemented (`article_map.yaml` + findings mapper planned)    |
-| Report generator    | Not yet implemented (HTML audit report planned)                       |
+| Observability       | Working — SQLite persistence of runs + findings                      |
+| Compliance mapper   | Working — `article_map.yaml` + findings mapper                       |
+| Report generator    | Working — HTML audit-style report                                    |
 
 ## Setup
 
@@ -70,6 +71,30 @@ uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/n
 This runs every attack pack in `redteam_engine/native/attack_packs/`, judges
 each response, and prints a summary of which attacks found a vulnerability.
 
+### Multi-turn attacks via PyRIT
+
+`redteam_engine/native/attack_packs/multi_turn_escalation.yaml` is tagged
+`engine: pyrit` and runs through [PyRIT](https://github.com/microsoft/PyRIT)'s
+`RedTeamingAttack` instead of the single-turn runner — an adversarial LLM
+(reusing the same `llm_client.py` provider config as the judge) iteratively
+escalates toward the attack's `goal` across several turns, with the target
+agent's own conversation-id continuity carrying state between them.
+
+PyRIT is a heavy optional dependency (transformers, datasets, several
+azure-\* SDKs), so it's kept out of the base install behind a `uv` dependency
+group:
+
+```bash
+uv add --group pyrit "pyrit==1.0.1"   # one-time setup
+
+uv run --group pyrit python cli.py run --target http://localhost:8000 \
+    --packs redteam_engine/native/attack_packs/multi_turn_escalation.yaml
+```
+
+Regular single-turn packs (and `--packs redteam_engine/native/attack_packs` to
+run everything) don't require the `pyrit` group at all — the CLI only imports
+it when a pack's `engine` field asks for it.
+
 ### Using the promptfoo engine
 
 `--engine promptfoo` swaps attack generation/delivery from the hand-written
@@ -93,12 +118,16 @@ project-typhon/
 │   ├── schemas.py         # pydantic models, shared by every engine
 │   ├── native/            # engine: hand-written attack packs
 │   │   ├── attack_packs/  # YAML attack definitions, grouped by category
-│   │   └── runner.py      # sends attack_packs prompts to target, collects responses
-│   └── promptfoo/         # engine: promptfoo, for generation/delivery only (never grading)
-│       ├── promptfooconfig.yaml
-│       └── runner.py      # drives `npx promptfoo` for generation/delivery, then calls judge.py
-├── observability/         # SQLite persistence of runs + findings (planned)
-├── compliance/            # findings → EU AI Act article mapping + report generator (planned)
+│   │   └── runner.py      # sends attack_packs prompts to target, collects responses (single-turn)
+│   ├── promptfoo/         # engine: promptfoo, for generation/delivery only (never grading)
+│   │   ├── promptfooconfig.yaml
+│   │   └── runner.py      # drives `npx promptfoo` for generation/delivery, then calls judge.py
+│   └── pyrit/             # multi-turn engine (opt-in, needs `--group pyrit`)
+│       ├── runner.py      # runs a pack through PyRIT's RedTeamingAttack
+│       ├── target.py      # PyRIT PromptTarget wrapping target_agent's /chat (the victim)
+│       └── chat_model.py  # PyRIT chat target backed by llm_client.py (attacker + judge, not a victim)
+├── observability/         # SQLite persistence of runs + findings
+├── compliance/            # findings → EU AI Act article mapping + report generator
 ├── reports/               # generated HTML reports land here
 ├── llm_client.py          # provider-agnostic LLM client (DeepSeek, OpenAI, Anthropic)
 ├── cli.py                 # single entrypoint: python cli.py run --target ... [--engine native|promptfoo]
