@@ -59,17 +59,23 @@ TARGET_MODEL=deepseek-chat
 Start the target agent (the mock chatbot being attacked):
 
 ```bash
-uv run uvicorn target_agent.main:app --reload
+uv run uvicorn target_agent.main:app --port 8000
 ```
 
-In another terminal, run a red-team attack against it:
+In another terminal, run a red-team attack against it. There are two engines
+for generating/delivering attacks (`judge.py` always grades, regardless of
+which one you pick) — the native engine is the default and needs no extra
+setup:
 
 ```bash
-uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/native/attack_packs
+uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/native/attack_packs --engine native
 ```
 
 This runs every attack pack in `redteam_engine/native/attack_packs/`, judges
 each response, and prints a summary of which attacks found a vulnerability.
+See [Using the promptfoo engine](#using-the-promptfoo-engine) and
+[Multi-turn attacks via PyRIT](#multi-turn-attacks-via-pyrit) below for the
+other two ways to attack the target.
 
 ### Multi-turn attacks via PyRIT
 

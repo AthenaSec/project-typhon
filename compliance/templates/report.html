@@ -63,6 +63,10 @@
   .finding dl { margin: 12px 0 0; font-family: var(--sans); font-size: 0.9rem; }
   .finding dt { font-weight: 600; margin-top: 12px; }
   .finding dd { margin: 4px 0 0; color: #333; }
+  .finding dd p { margin: 0 0 8px; }
+  .finding dd p:last-child { margin-bottom: 0; }
+  .finding dd ul, .finding dd ol { margin: 0 0 8px; padding-left: 1.4em; }
+  .finding dd code { font-family: monospace; background: #f2f2f2; padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
   .engine-tag {
     display: inline-block;
     font-family: var(--sans);
@@ -136,11 +140,11 @@
       <h3>{{ f.attack_name }}</h3>
       <dl>
         <dt>Evidence</dt>
-        <dd>{{ f.rationale }}</dd>
+        <dd>{{ f.rationale|markdown }}</dd>
         <dt>Why It Matters</dt>
-        <dd>{{ f.compliance_rationale }}</dd>
+        <dd>{{ f.compliance_rationale|markdown }}</dd>
         <dt>Remediation</dt>
-        <dd>{{ f.remediation }}</dd>
+        <dd>{{ f.remediation|markdown }}</dd>
       </dl>
       {% if f.turns %}
       <div class="transcript">

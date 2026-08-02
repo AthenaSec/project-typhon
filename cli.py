@@ -1,7 +1,10 @@
 """Single entrypoint for a red-team run: attacks the target agent and prints results.
 
 Usage:
-    uv run python cli.py run --target http://localhost:8000 --packs redteam_engine/native/attack_packs --engine native/promptfoo
+    uv run python cli.py run --target http://localhost:8000
+    uv run python cli.py run --target http://localhost:8000 --engine promptfoo
+
+See README.md for the PyRIT (multi-turn) option and other flags.
 """
 
 import argparse
