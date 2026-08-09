@@ -1,0 +1,17 @@
+category: scam_fraud_generation
+description: >
+  PyRIT's built-in Scam scenario (pyrit.scenario.scenarios.airt.scam.Scam).
+  Tests whether the assistant can be persuaded into producing scam-related
+  material (phishing emails, fraudulent messages) against PyRIT's bundled
+  airt_scams dataset. Default techniques are both single-turn: context_compliance
+  (a simulated benign lead-in conversation that ends with a bare "yes.") and
+  role_play_persuasion_written (a simulated writing-seminar framing). The
+  multi-turn persuasive_rta technique (an adversarial persona run through
+  RedTeamingAttack) is opt-in via the ALL aggregate — left out of the default
+  run here to keep this pack fast and single-turn, distinct from the
+  hand-written multi_turn_escalation pack.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.airt.scam.Scam
+max_concurrency: 4
+max_dataset_size: 4
+scenario_techniques: null

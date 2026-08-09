@@ -4,6 +4,7 @@ entrypoint so cli.py and the existing single-turn runner.py/judge.py never
 need to become async."""
 
 import asyncio
+import logging
 
 from pyrit.common.path import HARM_DEFINITION_PATH
 from pyrit.executor.attack import AttackAdversarialConfig, AttackConverterConfig, AttackScoringConfig
@@ -13,11 +14,14 @@ from pyrit.setup import IN_MEMORY, initialize_pyrit_async
 
 from observability.store import save_finding
 from redteam_engine.judge import judge_attack
+from redteam_engine.progress import progress
 from redteam_engine.pyrit.chat_model import LLMClientChatTarget
 from redteam_engine.pyrit.converters import build_converters, to_converter_configuration
 from redteam_engine.pyrit.strategies import build_strategy
 from redteam_engine.pyrit.target import FastAPIEditableTarget, FastAPITarget
 from redteam_engine.schemas import Attack, AttackPack, AttackResult, TurnRecord
+
+logger = logging.getLogger(__name__)
 
 # Strategies that need editable conversation history (they backtrack by
 # rewriting prior turns) get the stateless FastAPIEditableTarget instead of
@@ -117,7 +121,16 @@ async def _run_attack_async(target_url: str, pack: AttackPack, attack: Attack) -
     if turns:
         trace["turns"] = [t.model_dump() for t in turns]
     if judgment.vulnerable:
-        severity = await _score_severity_async(final_response, attack.goal, pack.pyrit_severity_scale)
+        # Severity is a supplementary metric on top of judge.py's pass/fail
+        # (see _score_severity_async docstring) — a transient scorer-LLM
+        # failure (e.g. an API timeout) shouldn't discard an otherwise-valid,
+        # already-judged finding, so it's caught here rather than left to
+        # propagate and abort the whole attack.
+        try:
+            severity = await _score_severity_async(final_response, attack.goal, pack.pyrit_severity_scale)
+        except Exception:
+            logger.exception("Severity scoring failed for attack %s (%s)", attack.id, pack.category)
+            severity = None
         if severity is not None:
             trace["severity"] = severity
 
@@ -138,8 +151,17 @@ async def _run_pack_async(target_url: str, pack: AttackPack, run_id: str) -> lis
     await initialize_pyrit_async(memory_db_type=IN_MEMORY)
     results = []
     for attack in pack.attacks:
-        print(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
-        result, trace = await _run_attack_async(target_url, pack, attack)
+        progress(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
+        try:
+            result, trace = await _run_attack_async(target_url, pack, attack)
+        except Exception:
+            # A single attack failing (e.g. a target/LLM API timeout) shouldn't
+            # abort the whole pack — log it, skip this attack, and keep going
+            # with the rest, same as the native engine's runner.
+            logger.exception("Attack %s (%s) failed", attack.id, pack.category)
+            print("ERROR")
+            continue
+
         print("VULNERABLE" if result.judgment.vulnerable else "held")
         save_finding(
             run_id,
@@ -156,5 +178,6 @@ async def _run_pack_async(target_url: str, pack: AttackPack, run_id: str) -> lis
 
 def run_pyrit_pack(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResult]:
     """Sync boundary for cli.py — the only asyncio.run() call in the codebase."""
-    print(f"\n[{pack.category}] running {len(pack.attacks)} attacks (pyrit/{pack.pyrit_strategy})")
+    print()
+    progress(f"[{pack.category}] running {len(pack.attacks)} attacks (pyrit/{pack.pyrit_strategy})")
     return asyncio.run(_run_pack_async(target_url, pack, run_id))

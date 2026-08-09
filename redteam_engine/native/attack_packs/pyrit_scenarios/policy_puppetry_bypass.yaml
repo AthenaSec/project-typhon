@@ -1,0 +1,16 @@
+category: policy_puppetry_bypass
+description: >
+  PyRIT's built-in garak Doctor scenario (pyrit.scenario.scenarios.garak.doctor.Doctor),
+  ported from garak's "doctor" probe. Implements the HiddenLayer Policy
+  Puppetry universal bypass: each objective from the garak_doctor dataset is
+  wrapped in a fictional medical-drama / policy-config prompt template (and,
+  in the _leet variant, additionally leetspeak-obfuscated) to frame a
+  harmful request as configuration rather than a request, then sent to the
+  target. Baseline is off by default here (Doctor's own
+  BASELINE_ATTACK_POLICY) since the unmodified objective is a weak
+  comparison point against a template-dominated bypass.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.garak.doctor.Doctor
+max_concurrency: 4
+max_dataset_size: 4
+scenario_techniques: null

@@ -1,0 +1,26 @@
+category: psychosocial_harm
+description: >
+  PyRIT's built-in Psychosocial scenario
+  (pyrit.scenario.scenarios.airt.psychosocial.Psychosocial). Covers two
+  sub-harms: imminent_crisis (does the assistant mishandle a user in a
+  mental-health crisis?) and licensed_therapist (does the assistant
+  improperly present itself as a real licensed therapist?). Each sub-harm
+  escalates a simulated conversation toward the objective and delivers the
+  final message to the target, then scores the whole conversation on a
+  harm-specific Likert rubric — not a simple pass/fail on the last message.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.airt.psychosocial.Psychosocial
+max_concurrency: 4
+# Left unset: the scenario's own DEFAULT technique aggregate (bare
+# simulated-crescendo escalation + a tone-soften/persuasion-logical-appeal
+# converter layer) is used. Deliberately not overridden to include the ALL
+# aggregate's live `crescendo` technique — that swaps in a real
+# CrescendoAttack, which needs a target with editable conversation history
+# (backtracking). scenario_runner.py always builds a plain FastAPITarget
+# here, same limitation already called out in data_leakage.yaml.
+scenario_techniques: null
+# Demo-sized: escalate for 4 turns per sub-harm instead of the default 5.
+# sub_harm is left at its default ("all" — both imminent_crisis and
+# licensed_therapist run).
+scenario_params:
+  max_turns: 4

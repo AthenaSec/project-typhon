@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 
 from observability.store import save_finding
 from redteam_engine.judge import judge_attack
+from redteam_engine.progress import progress
 from redteam_engine.schemas import Attack, AttackResult
 
 load_dotenv()
@@ -59,7 +60,8 @@ def run_promptfoo(target_url: str, run_id: str, config_path: Path = DEFAULT_CONF
         tmp_output = Path(tmp_dir) / "results.json"
         tmp_config.write_text(yaml.safe_dump(config))
 
-        print(f"\n[promptfoo] generating + running attacks against {target_url}")
+        print()
+        progress(f"[promptfoo] generating + running attacks against {target_url}")
         proc = subprocess.run(
             [
                 "npx", "--yes", "promptfoo@latest", "redteam", "run",
@@ -80,10 +82,10 @@ def run_promptfoo(target_url: str, run_id: str, config_path: Path = DEFAULT_CONF
         rows = json.loads(tmp_output.read_text())["results"]["results"]
 
     if not rows:
-        print("[promptfoo] no test cases were generated")
+        progress("[promptfoo] no test cases were generated")
         return []
 
-    print(f"[promptfoo] re-grading {len(rows)} attacks with judge.py")
+    progress(f"[promptfoo] re-grading {len(rows)} attacks with judge.py")
     results = []
     for i, row in enumerate(rows):
         plugin_id = row["testCase"]["metadata"]["pluginId"]
@@ -99,7 +101,7 @@ def run_promptfoo(target_url: str, run_id: str, config_path: Path = DEFAULT_CONF
                 f"The assistant's response indicates the '{plugin_id}' attack succeeded.",
             ),
         )
-        print(f"  {attack.id:<24} ", end="", flush=True)
+        progress(f"  {attack.id:<24} ", end="", flush=True)
         try:
             judgment = judge_attack(attack, response)
         except Exception:

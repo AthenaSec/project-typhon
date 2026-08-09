@@ -1,0 +1,26 @@
+category: foundry_red_team_sweep
+description: >
+  PyRIT's built-in RedTeamAgent scenario
+  (pyrit.scenario.scenarios.foundry.red_team_agent.RedTeamAgent) — the
+  "batteries included" preset built for the Azure AI Foundry Red Teaming
+  Agent integration. Runs HarmBench objectives through a broad set of
+  single-turn converters (base64, rot13, leetspeak, ascii art/smuggling,
+  unicode confusables, a random jailbreak template, ...). Broadest and
+  least individually curated pack in this file — a fast breadth sweep, not
+  a substitute for the hand-written/curated packs.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.foundry.red_team_agent.RedTeamAgent
+max_concurrency: 4
+# Left unset: RedTeamAgent's own default technique aggregate is EASY (the
+# single-turn converter techniques only). Deliberately not widened to
+# MODERATE/DIFFICULT/ALL — DIFFICULT includes the `crescendo` attack
+# technique, which needs a target with editable conversation history
+# (backtracking); scenario_runner.py always builds a plain FastAPITarget
+# here, same limitation already called out in data_leakage.yaml and
+# psychosocial_harm.yaml. MultiTurn (RedTeamingAttack), Pair, and Tap don't
+# have that requirement and could be added here once this pack has been
+# run/reviewed once at the EASY default.
+scenario_techniques: null
+# max_dataset_size intentionally not set: RedTeamAgent hard-codes
+# "harmbench" as a constructor default rather than exposing it via
+# required_datasets(). Its own default_dataset_config already caps at 4.

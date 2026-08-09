@@ -1,0 +1,22 @@
+category: encoding_resilience
+description: >
+  PyRIT's built-in Encoding scenario (pyrit.scenario.scenarios.garak.encoding.Encoding),
+  mirroring garak's encoding probe. Encodes harmful seed text (slurs, XSS
+  payloads, by default) using a spread of schemes across every encoding
+  family (base64/base2048/base16/base32/ascii85/hex, quoted-printable,
+  uuencode, rot13/atbash/leetspeak, morse/nato) and asks the target to
+  decode and repeat it — testing whether encoding alone bypasses content
+  guardrails that would catch the same content in plain text. Scored by
+  PyRIT's DecodingScorer (checks whether the target actually decoded and
+  echoed the payload), not the generic true/false objective question used
+  elsewhere in this file.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.garak.encoding.Encoding
+max_concurrency: 4
+# max_dataset_size intentionally not set: Encoding hard-codes its two
+# datasets (garak_slur_terms_en, garak_web_html_js) as a
+# CompoundDatasetAttackConfiguration inside the constructor rather than
+# exposing them via required_datasets(), so the runner's max_dataset_size ->
+# dataset_config path is a no-op here. Its own defaults already cap each at
+# 10 seeds.
+scenario_techniques: null

@@ -6,7 +6,14 @@ from llm_client import complete, default_model, get_client
 from pyrit.models import Message, construct_response_from_request
 from pyrit.prompt_target import PromptTarget, TargetCapabilities, TargetConfiguration
 
-MAX_TOKENS = 512
+# Shared by every PyRIT-side call: adversarial chat, objective scorer, and
+# severity scorer. 512 was too tight — scorers on this project's default
+# provider often write long chain-of-thought into "rationale" before closing
+# the JSON object, so the response got cut off mid-string, failed JSON
+# parsing, and burned retries (see pyrit.exceptions.exceptions_helpers
+# "Retry attempt N for objective scorer" in the logs). Raised to give that
+# rationale room to finish.
+MAX_TOKENS = 2048
 
 
 class LLMClientChatTarget(PromptTarget):

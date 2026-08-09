@@ -140,15 +140,18 @@ category: data_leakage
 engine: pyrit_scenario
 scenario_class: pyrit.scenario.scenarios.airt.leakage.Leakage
 max_concurrency: 4
-max_dataset_size: 3           # cap PyRIT's own named dataset, if it uses one
+max_dataset_size: 3           # cap PyRIT's own named dataset, if it exposes one via required_datasets()
 scenario_techniques:          # restrict to text-only, non-editable-history techniques
   - role_play_movie_script
   - many_shot
   - first_letter
   - flip
   - red_teaming
-scenario_kwargs: {}           # extra constructor kwargs a scenario needs directly
+scenario_kwargs: {}           # extra __init__ kwargs a scenario needs directly
                                # (e.g. WebInjection's max_prompts_per_technique)
+scenario_params: {}           # extra *run* params for Scenario.additional_parameters()-declared
+                               # inputs, resolved via set_params_from_args rather than __init__
+                               # (e.g. Psychosocial's sub_harm/max_turns, Jailbreak's jailbreak_names)
 ```
 
 Run one with:
@@ -158,14 +161,40 @@ uv run --group pyrit python cli.py run --target http://localhost:8000 \
     --packs redteam_engine/native/attack_packs/pyrit_scenarios/data_leakage.yaml
 ```
 
-Two scenarios are wired up so far — `airt.leakage.Leakage` (`data_leakage.yaml`)
-and `garak.web_injection.WebInjection` (`web_output_injection.yaml`) — chosen
-to prove the pattern; PyRIT ships several more (`benchmark`, `garak`, `airt`,
-`foundry`, `adaptive`) each with their own technique/dataset quirks worth
-validating individually rather than adopting in bulk. Note: `--packs
-redteam_engine/native/attack_packs` (the default, non-recursive) does **not**
-pick up `pyrit_scenarios/` — point `--packs` at it (or a specific file in it)
-explicitly, or combine both in one run (see below).
+All 12 non-modality scenarios PyRIT 1.0.1 ships are wired up:
+
+| Descriptor | `scenario_class` | Notes |
+|---|---|---|
+| `data_leakage.yaml` | `airt.leakage.Leakage` | system-prompt/credential/training-data leakage |
+| `web_output_injection.yaml` | `garak.web_injection.WebInjection` | markdown/XSS output injection |
+| `psychosocial_harm.yaml` | `airt.psychosocial.Psychosocial` | crisis mishandling, fake-therapist impersonation |
+| `jailbreak_template_sweep.yaml` | `airt.jailbreak.Jailbreak` | catalogued jailbreak templates (AIM, DAN, …) |
+| `cyber_malware_generation.yaml` | `airt.cyber.Cyber` | malware-generation willingness |
+| `rapid_response_content_harms.yaml` | `airt.rapid_response.RapidResponse` | fast multi-harm-category sweep |
+| `scam_fraud_generation.yaml` | `airt.scam.Scam` | phishing/fraud content generation |
+| `policy_puppetry_bypass.yaml` | `garak.doctor.Doctor` | HiddenLayer Policy Puppetry universal bypass |
+| `encoding_resilience.yaml` | `garak.encoding.Encoding` | does it decode + repeat harmful encoded payloads |
+| `foundry_red_team_sweep.yaml` | `foundry.red_team_agent.RedTeamAgent` | broad converter sweep (Azure AI Foundry preset) |
+| `adaptive_technique_sweep.yaml` | `adaptive.text_adaptive.TextAdaptive` | epsilon-greedy per-objective technique selection |
+
+`benchmark.adversarial.AdversarialBenchmark` is the one PyRIT scenario
+deliberately **not** wired up: it compares attack-success-rate across
+multiple *adversarial* (attacker) models, which needs a second named
+adversarial chat target registered in `TargetRegistry` alongside the one this
+project already registers from `LLM_PROVIDER`/`llm_client.py` — a
+multi-attacker-model comparison isn't something this PoC's single-model,
+single-target architecture is set up to do without inventing a second model
+to compare against.
+
+Every scenario's default technique aggregate was chosen deliberately to stay
+compatible with `scenario_runner.py`'s plain (non-editable-history)
+`FastAPITarget` — none of them select PyRIT's `crescendo*` techniques, which
+need a target that can rewrite prior turns (see `psychosocial_harm.yaml` and
+`foundry_red_team_sweep.yaml`'s comments for the specific exclusion in each).
+Note: `--packs redteam_engine/native/attack_packs` (the default,
+non-recursive) does **not** pick up `pyrit_scenarios/` — point `--packs` at
+it (or a specific file in it) explicitly, or combine both in one run (see
+below).
 
 ### Combining native packs and scenario sweeps in one run
 

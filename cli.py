@@ -15,6 +15,7 @@ packs, plus promptfoo) into the same run/report. Use --engine to restrict to one
 
 import argparse
 import logging
+import time
 from pathlib import Path
 
 import yaml
@@ -23,13 +24,18 @@ from compliance.mapper import map_findings
 from compliance.report_generator import generate_report
 from observability.store import finish_run, get_findings, init_db, start_run
 from redteam_engine.native.runner import load_attack_pack, run_pack
+from redteam_engine.progress import progress
 from redteam_engine.promptfoo.runner import run_promptfoo
 from redteam_engine.schemas import ScenarioPack
+
+logger = logging.getLogger(__name__)
 
 
 def cmd_run(args: argparse.Namespace) -> None:
     init_db()
     run_id = start_run(args.target)
+    started_at = time.monotonic()
+    progress(f"run {run_id} started against {args.target}")
 
     all_results = []
 
@@ -43,32 +49,46 @@ def cmd_run(args: argparse.Namespace) -> None:
             print(f"No attack packs found at {args.packs}")
 
         for pack_file in pack_files:
-            # A pyrit_scenario descriptor (ScenarioPack) doesn't have an
-            # attacks: list, so it can't validate as an AttackPack — peek at
-            # the raw engine key first to pick the right loader.
-            raw_engine = yaml.safe_load(pack_file.read_text()).get("engine")
-            if raw_engine == "pyrit_scenario":
-                from redteam_engine.pyrit.scenario_runner import run_pyrit_scenario  # lazy: optional `pyrit` dep group
+            # A pack/scenario failing outright (bad YAML, unreachable target,
+            # an unhandled PyRIT error, ...) shouldn't take down the rest of
+            # the run — log it and move on to the next pack so the report
+            # still covers everything that did complete.
+            try:
+                # A pyrit_scenario descriptor (ScenarioPack) doesn't have an
+                # attacks: list, so it can't validate as an AttackPack — peek
+                # at the raw engine key first to pick the right loader.
+                raw_engine = yaml.safe_load(pack_file.read_text()).get("engine")
+                if raw_engine == "pyrit_scenario":
+                    from redteam_engine.pyrit.scenario_runner import run_pyrit_scenario  # lazy: optional `pyrit` dep group
 
-                scenario_pack = ScenarioPack(**yaml.safe_load(pack_file.read_text()))
-                all_results.extend(run_pyrit_scenario(args.target, scenario_pack, run_id))
-                continue
+                    scenario_pack = ScenarioPack(**yaml.safe_load(pack_file.read_text()))
+                    all_results.extend(run_pyrit_scenario(args.target, scenario_pack, run_id))
+                    continue
 
-            pack = load_attack_pack(pack_file)
-            if pack.engine == "pyrit":
-                from redteam_engine.pyrit.runner import run_pyrit_pack  # lazy: optional `pyrit` dep group
+                pack = load_attack_pack(pack_file)
+                if pack.engine == "pyrit":
+                    from redteam_engine.pyrit.runner import run_pyrit_pack  # lazy: optional `pyrit` dep group
 
-                all_results.extend(run_pyrit_pack(args.target, pack, run_id))
-            else:
-                all_results.extend(run_pack(args.target, pack, run_id))
+                    all_results.extend(run_pyrit_pack(args.target, pack, run_id))
+                else:
+                    all_results.extend(run_pack(args.target, pack, run_id))
+            except Exception:
+                logger.exception("Pack %s failed, continuing with remaining packs", pack_file)
+                progress(f"[{pack_file}] FAILED — see log above, continuing with remaining packs")
 
     if args.engine in ("all", "promptfoo"):
-        all_results.extend(run_promptfoo(args.target, run_id))
+        try:
+            all_results.extend(run_promptfoo(args.target, run_id))
+        except Exception:
+            logger.exception("promptfoo engine failed")
+            progress("[promptfoo] FAILED — see log above, continuing")
 
     finish_run(run_id)
 
+    elapsed = time.monotonic() - started_at
     vulnerable = [r for r in all_results if r.judgment.vulnerable]
-    print(f"\n{len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
+    print()
+    progress(f"run finished in {elapsed:.1f}s — {len(all_results)} attacks run, {len(vulnerable)} vulnerabilities found")
     print(f"Run ID: {run_id}")
 
     if vulnerable:

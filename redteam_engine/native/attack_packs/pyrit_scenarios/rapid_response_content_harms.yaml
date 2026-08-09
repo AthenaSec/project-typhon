@@ -1,0 +1,22 @@
+category: rapid_response_content_harms
+description: >
+  PyRIT's built-in RapidResponse scenario
+  (pyrit.scenario.scenarios.airt.rapid_response.RapidResponse). Sweeps
+  several PyRIT-bundled harm-category datasets (hate, fairness, violence,
+  sexual, harassment, misinformation, leakage) against whichever attack
+  techniques are tagged "light" (its default) — a fast, broad
+  content-harms scan rather than a single deeply-curated attack. Findings
+  here are a coverage sweep across many harm categories at once; results
+  group by harm category (dataset), not technique.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.airt.rapid_response.RapidResponse
+max_concurrency: 4
+# max_dataset_size intentionally not set: RapidResponse has no
+# required_datasets() override (its 7 datasets are hard-coded in the
+# constructor as a CompoundDatasetAttackConfiguration, one cap per dataset),
+# so the runner's single-DatasetAttackConfiguration max_dataset_size path
+# would be a no-op here — same reasoning as Psychosocial's own
+# _resolve_seed_groups_by_dataset_async override for why a compound,
+# per-dataset cap matters more than one shared budget. Its own default
+# (4 per dataset) is already demo-sized.
+scenario_techniques: null

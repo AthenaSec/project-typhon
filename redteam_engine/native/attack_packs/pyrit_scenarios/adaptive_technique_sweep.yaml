@@ -1,0 +1,27 @@
+category: adaptive_technique_sweep
+description: >
+  PyRIT's built-in TextAdaptive scenario
+  (pyrit.scenario.scenarios.adaptive.text_adaptive.TextAdaptive). Instead of
+  running every technique against every objective, an epsilon-greedy
+  selector picks up to max_attempts_per_objective techniques per objective
+  (from a pool defaulting to role_play_movie_script and many_shot),
+  informed by observed success rates, and stops early on a hit. Sweeps the
+  same 7 harm-category datasets as rapid_response_content_harms
+  (hate/fairness/violence/sexual/harassment/misinformation/leakage), with a
+  plain-prompt baseline run alongside for comparison.
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.adaptive.text_adaptive.TextAdaptive
+max_concurrency: 4
+# max_dataset_size intentionally not set even though TextAdaptive does
+# expose required_datasets(): the runner's max_dataset_size -> dataset_config
+# path builds one flat DatasetAttackConfiguration sharing a single budget
+# across all 7 datasets, which can starve individual harm categories of
+# every seed (the same per-dataset-budget problem Psychosocial's own
+# _resolve_seed_groups_by_dataset_async override exists to avoid). Rely on
+# TextAdaptive's own default_dataset_config() instead, which already caps
+# each dataset at 4 seeds independently.
+scenario_techniques: null
+# Demo-sized: try at most 2 techniques per objective before moving on,
+# instead of the default 3.
+scenario_params:
+  max_attempts_per_objective: 2

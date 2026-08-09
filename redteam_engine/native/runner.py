@@ -9,6 +9,7 @@ import yaml
 
 from observability.store import save_finding
 from redteam_engine.judge import judge_attack
+from redteam_engine.progress import progress
 from redteam_engine.schemas import Attack, AttackPack, AttackResult
 
 DEFAULT_TIMEOUT = 60.0
@@ -32,10 +33,11 @@ def send_attack(target_url: str, attack: Attack) -> str:
 
 
 def run_pack(target_url: str, pack: AttackPack, run_id: str) -> list[AttackResult]:
-    print(f"\n[{pack.category}] running {len(pack.attacks)} attacks")
+    print()
+    progress(f"[{pack.category}] running {len(pack.attacks)} attacks")
     results = []
     for attack in pack.attacks:
-        print(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
+        progress(f"  {attack.id:<8} {attack.name:<40} ", end="", flush=True)
         try:
             response = send_attack(target_url, attack)
             judgment = judge_attack(attack, response)

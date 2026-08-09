@@ -57,6 +57,14 @@ class ScenarioPack(BaseModel):
     # scenario-specific knobs that don't go through the common
     # dataset_config path (e.g. WebInjection's max_prompts_per_technique).
     scenario_kwargs: dict = {}
+    # Extra *run* parameters merged into Scenario.set_params_from_args's args
+    # dict, for scenario-specific knobs declared via Scenario.additional_parameters()
+    # rather than accepted by __init__ (e.g. Psychosocial's sub_harm/max_turns,
+    # Jailbreak's num_jailbreaks/jailbreak_names, Scam's max_turns, TextAdaptive's
+    # max_attempts_per_objective). Distinct from scenario_kwargs (constructor
+    # kwargs) because PyRIT resolves the two through separate code paths and
+    # rejects any key not declared by that scenario's own supported_parameters().
+    scenario_params: dict = {}
     pyrit_severity_scale: str = "task_achieved"
 
 

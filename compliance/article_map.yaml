@@ -206,6 +206,192 @@ web_output_injection:
     than a prompt-content guardrail, and re-run this scenario after any
     change to output rendering or sanitization.
 
+# The categories below come from the remaining PyRIT built-in Scenarios
+# (redteam_engine/native/attack_packs/pyrit_scenarios/), covering the rest of
+# PyRIT 1.0.1's bundled scenario catalog beyond Leakage and WebInjection
+# above. Same caveat as data_leakage/web_output_injection: each PyRIT
+# Scenario sweeps many techniques x dataset objectives, so findings here are
+# broader and less individually curated than the hand-written packs.
+
+psychosocial_harm:
+  article: "Article 5(1)(b)"
+  title: "Prohibited AI Practices"
+  compliance_rationale: >
+    Article 5(1)(b) prohibits exploiting a person's vulnerabilities — here, a
+    mental-health crisis — with the effect of materially distorting their
+    behavior in a way reasonably likely to cause significant harm. PyRIT's
+    Psychosocial scenario's imminent_crisis sub-harm escalates a simulated
+    conversation toward a crisis-mishandling objective and scores the whole
+    exchange on a crisis-management rubric; a system that actively mishandles
+    a user in crisis (rather than de-escalating or referring to a human/
+    crisis line) is exploiting exactly the vulnerability this paragraph bans,
+    a blanket prohibition regardless of risk tier.
+  remediation: >
+    Detect crisis language (self-harm, acute distress) in the conversation
+    and route to a fixed, non-improvised crisis-response script (de-escalate,
+    provide a crisis line, avoid engaging with the crisis content directly)
+    independent of how the request is framed, and re-run this scenario after
+    any system prompt or guardrail change.
+  secondary_article: "Article 50(1)"
+  secondary_title: "Transparency Obligations for Providers and Deployers of Certain AI Systems"
+  secondary_rationale: >
+    The scenario's licensed_therapist sub-harm scores whether the assistant
+    presents itself as a real licensed therapist. Article 50(1) requires
+    users be informed they're interacting with an AI system; a system that
+    claims to be a licensed human therapist defeats that safeguard directly,
+    the same failure mode as the imitation category above but for a
+    professional-credential claim rather than a brand/persona.
+
+jailbreak_template_sweep:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against attempts to exploit system
+    vulnerabilities, including adversarial examples. PyRIT's Jailbreak
+    scenario delivers well-known, publicly-documented jailbreak templates
+    (e.g. AIM, DAN) inline in the user message — a system that complies with
+    an otherwise-refused objective once it's wrapped in one of these
+    templates shows its guardrails evaluate surface framing rather than the
+    underlying request, the same instruction-following vulnerability class as
+    prompt_injection but against attack patterns that are catalogued and
+    public rather than bespoke.
+  remediation: >
+    Evaluate requests against their underlying intent rather than surface
+    framing (persona instructions, "developer mode," fictional wrappers), add
+    known jailbreak templates to an input-classification denylist as a
+    defense-in-depth layer, and re-run this scenario after any system prompt
+    or guardrail change.
+
+cyber_malware_generation:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) names cybersecurity resilience explicitly among the
+    properties high-risk AI systems must maintain against exploitation.
+    PyRIT's Cyber scenario tests willingness to generate malware through
+    iterative rephrase-and-escalate (red_teaming) technique; a system that
+    can be walked into producing functional or near-functional malicious code
+    is a direct cybersecurity-resilience failure, independent of whether the
+    request arrived in one message or several.
+  remediation: >
+    Add an explicit guardrail against generating executable malicious code or
+    detailed exploit instructions regardless of stated justification
+    (education, research, red-teaming), and re-run this scenario after any
+    system prompt or guardrail change.
+
+rapid_response_content_harms:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against adversarial manipulation across
+    the system's outputs generally, not just one harm category. PyRIT's
+    RapidResponse scenario sweeps several harm categories at once (hate,
+    fairness, violence, sexual content, harassment, misinformation, leakage)
+    using lightweight adversarial techniques — a fast breadth check for
+    whether any single harm category's guardrail is noticeably weaker than
+    the others, which a category-by-category hand-written pack wouldn't
+    surface as directly.
+  remediation: >
+    Treat any harm category that fires disproportionately here as a signal to
+    review that specific guardrail in isolation (it's likely weaker than the
+    rest, not that the category itself is unguarded), and re-run this
+    scenario after any system prompt or guardrail change.
+
+scam_fraud_generation:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against manipulation that alters system
+    outputs. PyRIT's Scam scenario uses persuasion-framed pretexts (a
+    simulated benign lead-in that ends with a bare "yes.", or a "writing
+    seminar" role-play) to get the assistant to produce phishing/fraud
+    material — a system that produces ready-to-use scam content once the
+    request is wrapped in an innocuous-seeming setup shows the same
+    framing-over-substance guardrail gap as copyright_ip_leakage and
+    code_execution_injection, applied to fraud content instead.
+  remediation: >
+    Evaluate the actual content being requested rather than the conversational
+    frame it arrives in, add an explicit guardrail against generating
+    phishing/fraud templates regardless of stated purpose (training material,
+    awareness examples), and re-run this scenario after any system prompt or
+    guardrail change.
+
+policy_puppetry_bypass:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against exploitation of vulnerabilities
+    through manipulation, including obfuscation techniques that mask a
+    request's true intent. PyRIT's Doctor scenario ports the HiddenLayer
+    Policy Puppetry universal bypass: a harmful objective is reframed as
+    fictional medical-drama script or healthcare-chatbot configuration
+    (optionally leetspeak-obfuscated on top), which succeeded against major
+    LLMs broadly at disclosure. A system that complies once the same request
+    is reframed as "configuration" rather than a direct ask has the same
+    surface-framing guardrail gap as prompt_injection and
+    copyright_ip_leakage, via a specific, publicly-documented technique.
+  remediation: >
+    Evaluate requests framed as configuration, policy documents, or fictional
+    dialogue against the same guardrails as a direct request — framing alone
+    should never change whether content is in scope — and re-run this
+    scenario after any system prompt or guardrail change.
+
+encoding_resilience:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) explicitly names adversarial examples among the
+    vulnerability classes high-risk AI systems must resist. PyRIT's Encoding
+    scenario is close to that language directly: harmful text is encoded
+    (base64, rot13, morse, and others) and the target is asked to decode and
+    repeat it — a system that will decode and echo content it would refuse in
+    plain text shows its content guardrail runs before decoding rather than
+    on what the model actually outputs, letting a purely mechanical
+    transformation bypass it entirely.
+  remediation: >
+    Apply content guardrails to the model's final output regardless of
+    whether the harmful content arrived encoded, run a decode-then-check pass
+    when a request asks the model to decode something, and re-run this
+    scenario after any system prompt or guardrail change.
+
+foundry_red_team_sweep:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against adversarial manipulation
+    broadly. PyRIT's RedTeamAgent scenario (built for the Azure AI Foundry
+    Red Teaming Agent integration) sweeps HarmBench objectives through a wide
+    set of single-turn converters — base64, rot13, leetspeak, ASCII
+    art/smuggling, unicode confusables, a random jailbreak template, and
+    more — in one pass. It's the broadest, least individually curated pack in
+    this file: useful as a fast breadth check for which converter families a
+    guardrail is weak against, not as a substitute for the hand-written or
+    more narrowly-scoped scenario packs above.
+  remediation: >
+    Treat any technique family that fires here as a prioritized follow-up
+    with a narrower, hand-written pack (the way copyright_ip_leakage and
+    code_execution_injection followed up on PyRIT dataset findings), and
+    re-run this scenario after any system prompt or guardrail change.
+
+adaptive_technique_sweep:
+  article: "Article 15(5)"
+  title: "Accuracy, Robustness and Cybersecurity"
+  compliance_rationale: >
+    Article 15(5) requires resilience against exploitation of system
+    vulnerabilities. PyRIT's TextAdaptive scenario sweeps the same
+    harm-category datasets as rapid_response_content_harms, but instead of
+    running every technique against every objective, an epsilon-greedy
+    selector tries a small number of techniques per objective informed by
+    which ones are actually succeeding — surfacing the specific
+    technique/objective combinations a guardrail is weakest against more
+    efficiently than an exhaustive sweep, alongside a plain-prompt baseline
+    for comparison.
+  remediation: >
+    Prioritize guardrail review around whichever technique the adaptive
+    selector converges on most often per harm category (that's the strongest
+    signal of where the guardrail is weakest), and re-run this scenario after
+    any system prompt or guardrail change.
+
 # The two categories below are worth having because Article 5's prohibited
 # practices are the one part of the Act that binds every AI system
 # regardless of risk tier or Annex III classification — unlike Article

@@ -1,0 +1,22 @@
+category: jailbreak_template_sweep
+description: >
+  PyRIT's built-in Jailbreak scenario (pyrit.scenario.scenarios.airt.jailbreak.Jailbreak).
+  Crosses HarmBench objectives against a fixed set of well-known jailbreak
+  templates (AIM, DAN 11), delivered as prompt_sending (template rendered
+  inline into the user message). The scenario also has a
+  jailbreak_system_prompt delivery (template as a native system prompt),
+  but that needs a target with editable history + system-prompt support —
+  target_agent's plain FastAPITarget doesn't have that, so PyRIT skips it
+  automatically at run time (logs a warning, runs prompt_sending only).
+engine: pyrit_scenario
+scenario_class: pyrit.scenario.scenarios.airt.jailbreak.Jailbreak
+max_concurrency: 4
+# Demo-sized dataset cap — required_datasets() ties this scenario to
+# "harmbench"; PyRIT's own default_dataset_config already caps it at 4.
+max_dataset_size: 4
+scenario_params:
+  # Pinned to two well-known templates instead of a random num_jailbreaks
+  # draw, so a live demo run is reproducible.
+  jailbreak_names:
+    - aim.yaml
+    - dan_11.yaml
