@@ -12,10 +12,18 @@
 #     system, not which company/entity is behind it, so the citation rests
 #     on an inference the article doesn't state explicitly. Scrutinize this
 #     one harder than the 15(5) citations if it's ever challenged.
-#   Article 6 / Annex III (does the target even qualify as high-risk, which
-#     is what makes any Article 15 citation applicable at all) — OPEN.
-#     Every Article 15 mapping here assumes a "yes" that hasn't been
-#     established yet. Close this before showing a report externally.
+#   Article 6 / Annex III — READ (2026-08-14). Resolved for this MVP: as
+#     currently designed, the target discusses products/rates in general
+#     terms only and does not evaluate a specific person's creditworthiness
+#     or establish a credit score (see target_agent/system_prompt.txt), so
+#     it does not clear Annex III 5(b)'s "intended to evaluate
+#     creditworthiness" test. High-risk status is therefore NOT established,
+#     and the Article 15 citations below should be read as best-practice
+#     robustness benchmarks for a banking-adjacent assistant, not as
+#     asserted binding legal obligations, until the target's intended
+#     purpose changes. Re-run this determination — don't assume it still
+#     holds — once the target's system prompt changes or once new attack
+#     categories are added.
 #
 # `trigger_condition` states, in plain language, what an attack must
 # demonstrate for the citation to hold. It is written from the article text
